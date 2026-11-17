@@ -22,7 +22,7 @@ table{width:100%;border-collapse:collapse}td{padding:2px 4px}td:last-child{text-
 #ro{font:12px ui-monospace,Consolas,monospace;color:var(--mu);min-height:18px;margin-top:6px}
 .ov label{display:inline-block;margin:2px 10px 2px 0}
 input[type=range]{flex:1;min-width:140px}
-@media(max-width:900px){main{grid-template-columns:1fr}}
+@media(max-width:900px){main{grid-template-columns:1fr}section{order:-1}#ho{max-width:360px;display:block;margin:0 auto}}
 </style></head><body>
 <header>
 <label class="btn">Open .buf files<input id="fi" type="file" multiple></label>
@@ -45,6 +45,7 @@ input[type=range]{flex:1;min-width:140px}
 <label><input type="checkbox" id="o5" checked> RH ≥ 95% shading</label>
 <label><input type="checkbox" id="o6" checked> Parcel</label>
 <label><input type="checkbox" id="o7" checked> Dendritic zone</label>
+<label><input type="checkbox" id="o8" checked> Momentum transfer</label>
 <select id="ps"><option value="sfc">Surface parcel</option><option value="ml">Mixed layer (100 mb)</option><option value="mu">Most unstable (300 mb)</option><option value="925">925 mb</option><option value="850">850 mb</option><option value="800">800 mb</option><option value="700">700 mb</option><option value="600">600 mb</option></select></div>
 </aside>
 <section><svg id="sk" viewBox="0 0 940 720"></svg><div id="ro"></div></section>
@@ -161,6 +162,20 @@ function barb(x,y,dir,spd){
   if(hf){if(!fl&&!fu)pos-=4;const bx=x+ux*pos,by=y+uy*pos;d+=`M${bx} ${by}L${bx+px*5+ux*1.5} ${by+py*5+uy*1.5}`}
   return `<path d="${d}" fill="#fff" stroke="#fff" stroke-width="1.2"/>`;
 }
+function mixing(lv){
+  const a=lv[0],K=.2857,th0=(a.t+273.15)*Math.pow(1000/a.p,K);
+  const th=l=>(l.t+273.15)*Math.pow(1000/l.p,K)-th0;
+  let ptop=null;
+  for(let i=0;i<lv.length-1;i++){const d0=th(lv[i]),d1=th(lv[i+1]);
+    if(d1>0){ptop=d0>=0?lv[i].p:lv[i].p*Math.pow(lv[i+1].p/lv[i].p,-d0/(d1-d0));break}}
+  if(ptop==null||a.p-ptop<5||a.u==null||a.hgt==null)return null;
+  const ut=ip(lv,ptop,'u'),vt=ip(lv,ptop,'v');if(ut==null)return null;
+  const pts=lv.filter(l=>l.p>=ptop&&l.spd!=null);pts.push({p:ptop,spd:Math.hypot(ut,vt)});
+  let mx=0,sw=0,sp=0;
+  pts.forEach((q,i)=>{mx=Math.max(mx,q.spd);if(i){const w=pts[i-1].p-q.p;sw+=w;sp+=w*(q.spd+pts[i-1].spd)/2}});
+  const zt=HP(lv,ptop);if(zt==null)return null;
+  return {th0,ptop,top:[(Math.atan2(-ut,-vt)*180/Math.PI+360)%360,Math.hypot(ut,vt)],sfc:[a.dir,a.spd],mean:sw?sp/sw:a.spd,max:mx,depth:zt-a.hgt};
+}
 function draw(){
   const f=F[fi],s=f.times[ti],lv=s.lev,h0=lv[0].hgt;
   let h=`<defs><clipPath id="c"><rect x="${M.l}" y="${M.t}" width="${PW}" height="${PH}"/></clipPath></defs><rect width="${W}" height="${H}" fill="#000"/><g clip-path="url(#c)">`;
@@ -177,15 +192,24 @@ function draw(){
   h+=pl(lv.filter(l=>l.td!=null).map(l=>X(l.td,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),'#22e822',2.5);
   h+=pl(lv.map(l=>X(l.t,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),'#ff2020',2.5);
   let dg=null;
-  if($('#o7').checked){let pt=1e9,pb=0;
-    for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1],d=b.t-a.t;if(!d)continue;
-      const u=(-12-a.t)/d,v=(-18-a.t)/d,lo=Math.max(0,Math.min(u,v)),hi=Math.min(1,Math.max(u,v));
+  if($('#o7').checked){dg=[];
+    for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1],d=b.t-a.t;if(b.p<P1)break;
+      let lo,hi;
+      if(d){const u=(-12-a.t)/d,v=(-18-a.t)/d;lo=Math.max(0,Math.min(u,v));hi=Math.min(1,Math.max(u,v))}
+      else if(a.t<=-12&&a.t>=-18){lo=0;hi=1}else continue;
       if(lo>=hi)continue;
       const q=t=>{const p=Math.exp(lp(a.p)+t*(lp(b.p)-lp(a.p)));return [X(a.t+t*d,p).toFixed(1)+','+Y(p).toFixed(1),p]};
-      const A=q(lo),B=q(hi);h+=pl([A[0],B[0]],'#ff5ad8',5);pt=Math.min(pt,A[1],B[1]);pb=Math.max(pb,A[1],B[1])}
-    if(pb)dg=[pb,pt]}
+      const A=q(lo),B=q(hi);h+=pl([A[0],B[0]],'#ff5ad8',5);
+      const lst=dg[dg.length-1];if(lst&&Math.abs(lst[1]-A[1])<.05)lst[1]=B[1];else dg.push([A[1],B[1]])}}
   s.dgz=dg;
   const pc=$('#o6').checked?parcel(lv,$('#ps').value):null;if(pc)h+=pc.svg;
+  const mx=$('#o8').checked?mixing(lv):null;s.mix=mx;
+  if(mx){const tp=p=>X(mx.th0*Math.pow(p/1000,.2857)-273.15,p),mp=[];
+    for(let p=lv[0].p;p>mx.ptop;p-=5)mp.push(tp(p).toFixed(1)+','+Y(p).toFixed(1));
+    mp.push(tp(mx.ptop).toFixed(1)+','+Y(mx.ptop).toFixed(1));
+    h+=pl(mp,'#f2f2f2',4);
+    const lab=(p,w,dy)=>w[0]==null?'':`<text x='${tp(p)+10}' y='${Y(p)+dy}' fill='#fff' font-size='12'>→ ${Math.round(w[0])}° ${Math.round(w[1])} kt</text>`;
+    h+=lab(mx.ptop,mx.top,4)+lab(lv[0].p,mx.sfc,Y(lv[0].p)-Y(mx.ptop)<18?16:-4)}
   h+=`</g>`;
   for(const p of [1000,900,800,700,600,500,400,300,200,100]){
     h+=`<text x="${M.l-4}" y="${Y(p)+4}" fill="#ccc" font-size="12" text-anchor="end">${p}</text>`;
@@ -218,7 +242,10 @@ function indices(s,pc){
   for(const [k,n,d] of [['CAPE','CAPE J/kg',0],['CINS','CIN J/kg',0],['LCLP','LCL mb',0],['PWAT','PWAT mm',1],['KINX','K index',0],['TOTL','Total totals',0],['SHOW','Showalter',1],['LIFT','Lifted idx',1]])
     if(k in st)add(n,f(st[k],d));
   if(pc){add(`${$('#ps').selectedOptions[0].text}: CAPE / CIN`,`${f(pc.cape)} / ${f(pc.cin)}`);add('LCL / LFC / EL mb',[pc.lcl,pc.lfc,pc.el].map(v=>v==null?'–':Math.round(v)).join(' / '))}
-  if(s.dgz){const z0=HP(lv,s.dgz[0]),z1=HP(lv,s.dgz[1]);add('Dendritic zone mb (depth)',`${Math.round(s.dgz[0])}–${Math.round(s.dgz[1])}`+(z0!=null&&z1!=null?` (${Math.round(z1-z0)} m)`:''))}
+  if(s.dgz&&s.dgz.length)add('Dendritic zone (depth)',s.dgz.map(([pb,pt])=>{const z0=HP(lv,pb),z1=HP(lv,pt);return `${Math.round(pb)}–${Math.round(pt)} mb`+(z0!=null&&z1!=null?` (${Math.round(z1-z0)} m)`:'')}).join('<br>'))
+  if(s.mix){const m=s.mix;add('Mixing height AGL',`${Math.round(m.depth)} m / ${Math.round(m.depth*3.281)} ft`);
+    add('Wind at mix top',`${Math.round(m.top[0])}° @ ${Math.round(m.top[1])} kt`);
+    add('Mixed-layer wind mean / max',`${m.mean.toFixed(0)} / ${m.max.toFixed(0)} kt`)}
   const H=p=>HP(lv,p);
   add('H1000 / 850 / 700 m',`${f(H(1000))} / ${f(H(850))} / ${f(H(700))}`);
   const t=(a,b)=>H(a)!=null&&H(b)!=null?f(H(b)-H(a)):'–';
@@ -238,7 +265,8 @@ function hover(e){
   const g=(k,d=1)=>{const v=ip(lv,p,k);return v==null?'–':v.toFixed(d)};
   const u=ip(lv,p,'u'),v=ip(lv,p,'v');let w='–';
   if(u!=null){const sp=Math.hypot(u,v),dr=(Math.atan2(-u,-v)*180/Math.PI+360)%360;w=`${dr.toFixed(0)}° @ ${sp.toFixed(0)} kt`}
-  $('#ro').textContent=`${p.toFixed(0)} mb  ${g('hgt',0)} m  T ${g('t')}°C  Td ${g('td')}°C  Tw ${g('tw')}°C  wind ${w}  ω ${g('om',2)}`;
+  const zz=ip(lv,p,'hgt'),zs=zz==null?'–':`${Math.round(zz)} m / ${Math.round(zz*3.281)} ft MSL (${Math.round((zz-lv[0].hgt)*3.281)} ft AGL)`;
+  $('#ro').textContent=`${p.toFixed(0)} mb  ${zs}  T${g('t')}°C  Td ${g('td')}°C  Tw ${g('tw')}°C  wind ${w}  ω ${g('om',2)}`;
 }
 let MAN=null;
 async function initPicker(){
@@ -269,7 +297,7 @@ $('#fs').onchange=e=>{fi=+e.target.value;setF()};
 $('#tr').oninput=e=>{ti=+e.target.value;draw()};
 $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
-['o1','o2','o3','o4','o5','o6','o7','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
+['o1','o2','o3','o4','o5','o6','o7','o8','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
 $('#sk').addEventListener('mousemove',e=>F.length&&hover(e));
 document.addEventListener('keydown',e=>{if(!F.length)return;
   if(e.key=='ArrowRight')step(1);else if(e.key=='ArrowLeft')step(-1);
