@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 
 BASE = os.environ.get("BUFKIT_BASE", "https://www.meteo.psu.edu/bufkit/data")
-STATIONS = ["KRDU", "KGSO", "KINT", "KFAY", "KRWI"]
+STATIONS = ["KRDU", "KGSO", "KINT", "KFAY", "KRWI", "KGSB", "KIXA", "KRCZ", "FFC", "KATL", "KAVL", "KCLT", "KDAN", "KBLF", "KLWB", "KLYH", "KROA"]
 
 # dir/prefix: PSU folder and file prefix. step: hours between runs.
 # lookback: how many hours back to look for a run (keeps requests to PSU small).
