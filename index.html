@@ -3,11 +3,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>BUFKIT Skew-T Viewer</title>
 <style>
-:root{color-scheme:dark;--bg:#0b0d10;--pn:#161a20;--tx:#e6e9ee;--mu:#8b93a1;--ac:#4da3ff;--bd:#2a303a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{color-scheme:dark;--bg:#0b0d10;--pn:#161a20;--tx:#e6e9ee;--mu:#8b93a1;--ac:#4da3ff;--bd:#2a303a;--bt:#222833;--sk:#000;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[data-theme=light]{color-scheme:light;--bg:#eef1f5;--pn:#ffffff;--tx:#1b2330;--mu:#5a6474;--ac:#1c6fd1;--bd:#c9d0da;--bt:#e9edf2;--sk:#fff}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--tx);font:13px system-ui,-apple-system,"Segoe UI",sans-serif}
 header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;background:var(--pn);border-bottom:1px solid var(--bd)}
-button,select,label.btn{background:#222833;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
+button,select,label.btn{background:var(--bt);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer}
 button:hover,label.btn:hover{border-color:var(--ac)}
 input[type=file]{display:none}
 #title{font-weight:600;margin-left:6px}
@@ -18,7 +19,7 @@ aside{display:flex;flex-direction:column;gap:10px}
 .card{background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:8px}
 .card h3{margin:0 0 6px;font-size:12px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 table{width:100%;border-collapse:collapse}td{padding:2px 4px}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
-#sk{width:100%;height:auto;max-height:calc(100vh - 150px);background:#000;border-radius:8px;display:block}
+#sk{width:100%;height:auto;max-height:calc(100vh - 150px);background:var(--sk);border-radius:8px;display:block}
 #ro{font:12px ui-monospace,Consolas,monospace;color:var(--mu);min-height:18px;margin-top:6px}
 .ov{align-self:start;position:sticky;top:10px}.ov label{display:block;margin:5px 0}.ov select{width:100%;margin-top:6px}
 input[type=range]{flex:1;min-width:140px}
@@ -29,7 +30,7 @@ input[type=range]{flex:1;min-width:140px}
 <span id="pk" style="display:none;gap:6px;align-items:center"><select id="st"></select><select id="md"></select><span id="cyc" style="color:var(--mu)"></span></span>
 <select id="fs"></select>
 <button id="pv">◀</button><input id="tr" type="range" min="0" max="0" value="0"><button id="nx">▶</button><button id="pl">Play</button>
-<span id="title"></span>
+<span id="title"></span><button id="th" title="Switch light / dark" style="margin-left:auto">◐ Theme</button>
 </header>
 <div id="drop">Drag and drop one or more BUFKIT .buf files here, or use “Open .buf files.”<br>Files stay in your browser; nothing is uploaded.<br>Arrow keys: ←/→ change forecast hour, ↑/↓ change file.</div>
 <main id="mn">
@@ -57,6 +58,18 @@ const Y=p=>M.t+(lp(p)-lp(P1))/(lp(P0)-lp(P1))*PH;
 const X=(T,p)=>M.l+(T+40)/90*PW+(M.t+PH-Y(p));
 const PI=y=>Math.exp(lp(P1)+(y-M.t)/PH*(lp(P0)-lp(P1)));
 let F=[],fi=0,ti=0,timer=null;
+const TH={
+  dark:{bg:'#000',iso:'#1b2670',iso0:'#3a7bff',dry:'#0b6b6b',prs:'#555',wb:'#27d3e0',td:'#22e822',t:'#ff2020',ax:'#ccc',hgt:'#e8c34a',rh:'#fff',rhOp:.45,barb:'#fff',barbS:'#e8c34a',parc:'#ffd400',mix:'#f2f2f2',lab:'#fff',xh:'#fff',hb:'#000',hg:'#333',ht:'#777',hc:['#f33','#3d3','#ee3','#3dd']},
+  light:{bg:'#fff',iso:'#c3cdf0',iso0:'#2456d6',dry:'#8cc3bb',prs:'#9aa1ad',wb:'#0a95a3',td:'#0b9a0b',t:'#d41414',ax:'#222',hgt:'#8a6200',rh:'#6f8fc4',rhOp:.3,barb:'#111',barbS:'#8a4a00',parc:'#c26a00',mix:'#111',lab:'#111',xh:'#000',hb:'#fff',hg:'#d0d4da',ht:'#666',hc:['#d11','#0a0','#b09500','#08a']}};
+let C=TH.dark;
+function setTheme(m){
+  C=TH[m]||TH.dark;document.documentElement.dataset.theme=m;
+  try{localStorage.setItem('skewt-theme',m)}catch(e){}
+  if(F.length)draw();
+}
+(function(){let m=null;try{m=localStorage.getItem('skewt-theme')}catch(e){}
+  if(m!=='light'&&m!=='dark')m=window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
+  C=TH[m];document.documentElement.dataset.theme=m})();
 
 function parse(txt){
   const g=r=>(txt.match(r)||[])[1];
@@ -131,10 +144,10 @@ function parcel(lv,kind){
     if(lfc==null){if(av>0){lfc=q[0];cape+=ar;cz.push(q,c)}else{cin+=ar;if(!iz.length)iz.push(q);iz.push(c)}}
     else if(av>0){cape+=ar;el=c[0];cz.push(c)}else done=true}
   const pt=(arr,k)=>arr.map(q=>X(q[k]-273.15,q[0]).toFixed(1)+','+Y(q[0]).toFixed(1));
-  let svg=`<polyline points='${pt(path,1).join(' ')}' fill='none' stroke='#ffd400' stroke-width='2' stroke-dasharray='6 3'/>`;
+  let svg=`<polyline points='${pt(path,1).join(' ')}' fill='none' stroke='${C.parc}' stroke-width='2' stroke-dasharray='6 3'/>`;
   if(cz.length>1)svg+=`<polygon points='${pt(cz,1).concat(pt(cz,2).reverse()).join(' ')}' fill='#ff3030' fill-opacity='.35'/>`;
   if(iz.length>1)svg+=`<polygon points='${pt(iz,1).concat(pt(iz,2).reverse()).join(' ')}' fill='#3a7bff' fill-opacity='.4'/>`;
-  [['LCL',pl],['LFC',lfc],['EL',el]].forEach(([n,p])=>{if(p!=null&&p>=P1&&p<=p0)svg+=ln(M.l+PW-70,Y(p),M.l+PW,Y(p),'#ffd400',1)+`<text x='${M.l+PW-68}' y='${Y(p)-3}' fill='#ffd400' font-size='11'>${n}</text>`});
+  [['LCL',pl],['LFC',lfc],['EL',el]].forEach(([n,p])=>{if(p!=null&&p>=P1&&p<=p0)svg+=ln(M.l+PW-70,Y(p),M.l+PW,Y(p),C.parc,1)+`<text x='${M.l+PW-68}' y='${Y(p)-3}' fill='${C.parc}' font-size='11'>${n}</text>`});
   return {svg,cape,cin,lcl:pl,lfc,el};
 }
 const PTL=[[1537,1330,1537,1312],[1530,1312,1537,1312],[1537,1312,1550,1310],[1550,1330,1550,1281],[1550,1310,1580,1314],[1550,1303,1580,1299],[1550,1293,1580,1290],[1500,1303,1531,1298],[1530,1312,1530,1298],[1531,1298,1537,1290],[1537,1290,1541,1278],[1541,1278,1545,1260],[1537,1312,1542,1290],[1536,1290,1550,1290],[1550,1281,1560,1260]];
@@ -151,16 +164,16 @@ function ptype(lv){
     s+=`<circle cx='${sx(cx)}' cy='${sy(cy)}' r='6' fill='#f00' stroke='#00f'/>`;note=`x: 850–700 mb = ${x.toFixed(0)} m · y: 1000–850 mb = ${y.toFixed(0)} m`}
   $('#pt').innerHTML=s;$('#ptn').textContent=note;
 }
-function barb(x,y,dir,spd){
+function barb(x,y,dir,spd,col){
   const a=dir*Math.PI/180,ux=Math.sin(a),uy=-Math.cos(a),px=-uy,py=ux,L=28;
   const s=Math.round(spd/5)*5;
-  if(s<5)return `<circle cx="${x}" cy="${y}" r="3" fill="none" stroke="#fff"/>`;
+  if(s<5)return `<circle cx="${x}" cy="${y}" r="3" fill="none" stroke="${col}"/>`;
   let d=`M${x} ${y}L${x+ux*L} ${y+uy*L}`,pos=L,fl=Math.floor(s/50),fu=Math.floor(s%50/10),hf=s%10>=5;
   for(let i=0;i<fl;i++){const bx=x+ux*pos,by=y+uy*pos,cx=x+ux*(pos-5),cy=y+uy*(pos-5);
     d+=`M${bx} ${by}L${bx+px*10} ${by+py*10}L${cx} ${cy}Z`;pos-=6}
   for(let i=0;i<fu;i++){const bx=x+ux*pos,by=y+uy*pos;d+=`M${bx} ${by}L${bx+px*10+ux*3} ${by+py*10+uy*3}`;pos-=4}
   if(hf){if(!fl&&!fu)pos-=4;const bx=x+ux*pos,by=y+uy*pos;d+=`M${bx} ${by}L${bx+px*5+ux*1.5} ${by+py*5+uy*1.5}`}
-  return `<path d="${d}" fill="#fff" stroke="#fff" stroke-width="1.2"/>`;
+  return `<path d="${d}" fill="${col}" stroke="${col}" stroke-width="1.2"/>`;
 }
 function mixing(lv){
   const a=lv[0],K=.2857,th0=(a.t+273.15)*Math.pow(1000/a.p,K);
@@ -170,27 +183,28 @@ function mixing(lv){
     if(d1>0){ptop=d0>=0?lv[i].p:lv[i].p*Math.pow(lv[i+1].p/lv[i].p,-d0/(d1-d0));break}}
   if(ptop==null||a.p-ptop<5||a.u==null||a.hgt==null)return null;
   const ut=ip(lv,ptop,'u'),vt=ip(lv,ptop,'v');if(ut==null)return null;
-  const pts=lv.filter(l=>l.p>=ptop&&l.spd!=null);pts.push({p:ptop,spd:Math.hypot(ut,vt)});
-  let mx=0,sw=0,sp=0;
-  pts.forEach((q,i)=>{mx=Math.max(mx,q.spd);if(i){const w=pts[i-1].p-q.p;sw+=w;sp+=w*(q.spd+pts[i-1].spd)/2}});
+  const pts=lv.filter(l=>l.p>=ptop&&l.u!=null);pts.push({p:ptop,spd:Math.hypot(ut,vt),u:ut,v:vt});
+  let mx=0,su=0,sv=0,sp=0;
+  pts.forEach(q=>{mx=Math.max(mx,q.spd);su+=q.u;sv+=q.v;sp+=q.p});
+  const mu=su/pts.length,mv=sv/pts.length;
   const zt=HP(lv,ptop);if(zt==null)return null;
-  return {th0,ptop,top:[(Math.atan2(-ut,-vt)*180/Math.PI+360)%360,Math.hypot(ut,vt)],sfc:[a.dir,a.spd],mean:sw?sp/sw:a.spd,max:mx,depth:zt-a.hgt};
+  return {th0,ptop,top:[(Math.atan2(-ut,-vt)*180/Math.PI+360)%360,Math.hypot(ut,vt)],sfc:[a.dir,a.spd],mean:[(Math.atan2(-mu,-mv)*180/Math.PI+360)%360,Math.hypot(mu,mv)],pm:sp/pts.length,max:mx,depth:zt-a.hgt};
 }
 function draw(){
   const f=F[fi],s=f.times[ti],lv=s.lev,h0=lv[0].hgt;
-  let h=`<defs><clipPath id="c"><rect x="${M.l}" y="${M.t}" width="${PW}" height="${PH}"/></clipPath></defs><rect width="${W}" height="${H}" fill="#000"/><g clip-path="url(#c)">`;
+  let h=`<defs><clipPath id="c"><rect x="${M.l}" y="${M.t}" width="${PW}" height="${PH}"/></clipPath></defs><rect width="${W}" height="${H}" fill="${C.bg}"/><g clip-path="url(#c)">`;
   if($('#o5').checked)for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1];
     const rl=l=>l.td==null?0:es(l.td)/es(l.t)*100,ri=l=>l.td==null||l.t>=0?0:es(l.td)/esi(l.t)*100;
-    const c=(rl(a)>=95&&rl(b)>=95)||(ri(a)>=95&&ri(b)>=95)?'#fff':null;
-    if(c)h+=`<rect x='${M.l}' y='${Y(b.p)}' width='${PW}' height='${Y(a.p)-Y(b.p)}' fill='${c}' fill-opacity='.45'/>`}
-  for(let T=-150;T<=50;T+=10)h+=ln(X(T,P0),Y(P0),X(T,P1),Y(P1),T==0?'#3a7bff':'#1b2670',T==0?1.6:1);
+    const c=(rl(a)>=95&&rl(b)>=95)||(ri(a)>=95&&ri(b)>=95)?C.rh:null;
+    if(c)h+=`<rect x='${M.l}' y='${Y(b.p)}' width='${PW}' height='${Y(a.p)-Y(b.p)}' fill='${c}' fill-opacity='${C.rhOp}'/>`}
+  for(let T=-150;T<=50;T+=10)h+=ln(X(T,P0),Y(P0),X(T,P1),Y(P1),T==0?C.iso0:C.iso,T==0?1.6:1);
   if($('#o1').checked)for(let th=250;th<=600;th+=10){const pts=[];
     for(let p=P0;p>=P1;p-=25)pts.push(X(th*Math.pow(p/1000,.2857)-273.15,p).toFixed(1)+','+Y(p).toFixed(1));
-    h+=pl(pts,'#0b6b6b',1,'4 4')}
-  for(const p of [1000,900,800,700,600,500,400,300,200,100])h+=ln(M.l,Y(p),M.l+PW,Y(p),'#555',1,'2 3');
-  if($('#o2').checked)h+=pl(lv.filter(l=>l.tw!=null).map(l=>X(l.tw,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),'#27d3e0',1.5,'5 3');
-  h+=pl(lv.filter(l=>l.td!=null).map(l=>X(l.td,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),'#22e822',2.5);
-  h+=pl(lv.map(l=>X(l.t,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),'#ff2020',2.5);
+    h+=pl(pts,C.dry,1,'4 4')}
+  for(const p of [1000,900,800,700,600,500,400,300,200,100])h+=ln(M.l,Y(p),M.l+PW,Y(p),C.prs,1,'2 3');
+  if($('#o2').checked)h+=pl(lv.filter(l=>l.tw!=null).map(l=>X(l.tw,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),C.wb,1.5,'5 3');
+  h+=pl(lv.filter(l=>l.td!=null).map(l=>X(l.td,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),C.td,2.5);
+  h+=pl(lv.map(l=>X(l.t,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),C.t,2.5);
   let dg=null;
   if($('#o7').checked){dg=[];
     for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1],d=b.t-a.t;if(b.p<P1)break;
@@ -207,33 +221,33 @@ function draw(){
   if(mx){const tp=p=>X(mx.th0*Math.pow(p/1000,.2857)-273.15,p),mp=[];
     for(let p=lv[0].p;p>mx.ptop;p-=5)mp.push(tp(p).toFixed(1)+','+Y(p).toFixed(1));
     mp.push(tp(mx.ptop).toFixed(1)+','+Y(mx.ptop).toFixed(1));
-    h+=pl(mp,'#f2f2f2',4);
-    const lab=(p,w,dy)=>w[0]==null?'':`<text x='${tp(p)+10}' y='${Y(p)+dy}' fill='#fff' font-size='12'>→ ${Math.round(w[0])}° ${Math.round(w[1])} kt</text>`;
-    h+=lab(mx.ptop,mx.top,4)+lab(lv[0].p,mx.sfc,Y(lv[0].p)-Y(mx.ptop)<18?16:-4)}
+    h+=pl(mp,C.mix,4);
+    const lab=(p,w,dy)=>w[0]==null?'':`<text x='${tp(p)+10}' y='${Y(p)+dy}' fill='${C.lab}' font-size='12'>→ ${Math.round(w[0])}° ${Math.round(w[1])} kt</text>`;
+    h+=lab(mx.ptop,mx.top,4)+lab(mx.pm,mx.mean,Y(mx.pm)-Y(mx.ptop)<18?16:4)}
   h+=`</g>`;
   for(const p of [1000,900,800,700,600,500,400,300,200,100]){
-    h+=`<text x="${M.l-4}" y="${Y(p)+4}" fill="#ccc" font-size="12" text-anchor="end">${p}</text>`;
-    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${Y(p)-3}" fill="#e8c34a" font-size="11">${Math.round(z)} m</text>`}}
-  for(let T=-40;T<=50;T+=10)h+=`<text x="${X(T,P0)}" y="${H-8}" fill="#ccc" font-size="12" text-anchor="middle">${T}</text>`;
+    h+=`<text x="${M.l-4}" y="${Y(p)+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
+    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${Y(p)-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m</text>`}}
+  for(let T=-40;T<=50;T+=10)h+=`<text x="${X(T,P0)}" y="${H-8}" fill="${C.ax}" font-size="12" text-anchor="middle">${T}</text>`;
   if($('#o3').checked){let last=1e9;
     for(const l of lv){const y=Y(l.p);if(l.dir==null||y<M.t||y>M.t+PH||Math.abs(y-last)<16)continue;last=y;
-      const c=l.spd>=50?'#e8c34a':'#fff';h+=`<g fill="${c}" stroke="${c}">${barb(W-34,y,l.dir,l.spd)}</g>`}}
-  h+=`<line id="xh" x1="${M.l}" x2="${M.l+PW}" y1="-9" y2="-9" stroke="#fff" stroke-opacity=".5"/><rect id="ov" x="${M.l}" y="${M.t}" width="${PW}" height="${PH}" fill="transparent"/>`;
+      const c=l.spd>=50?C.barbS:C.barb;h+=`<g>${barb(W-34,y,l.dir,l.spd,c)}</g>`}}
+  h+=`<line id="xh" x1="${M.l}" x2="${M.l+PW}" y1="-9" y2="-9" stroke="${C.xh}" stroke-opacity=".5"/><rect id="ov" x="${M.l}" y="${M.t}" width="${PW}" height="${PH}" fill="transparent"/>`;
   $('#sk').innerHTML=h;
   const dt=new Date(s.d),fh=Math.round((s.d-f.times[0].d)/36e5);
   $('#title').textContent=`${f.stid} ${dt.toUTCString().slice(5,22)} UTC (F${String(fh).padStart(3,'0')}) · ${dt.toLocaleString([],{weekday:'short',month:'numeric',day:'numeric',hour:'numeric',timeZoneName:'short'})}`;
   hodo(lv);indices(s,pc);ptype(lv);
 }
 function hodo(lv){
-  const c=$('#ho'),g=c.getContext('2d'),S=c.width,m=S/2;g.fillStyle='#000';g.fillRect(0,0,S,S);
+  const c=$('#ho'),g=c.getContext('2d'),S=c.width,m=S/2;g.fillStyle=C.hb;g.fillRect(0,0,S,S);
   const pts=lv.filter(l=>l.u!=null&&l.hgt!=null&&l.hgt-lv[0].hgt<=9000);
   const mx=Math.max(30,Math.ceil(Math.max(...pts.map(l=>l.spd))/10)*10),k=(m-14)/mx;
-  g.strokeStyle='#333';g.fillStyle='#777';g.font='10px sans-serif';
+  g.strokeStyle=C.hg;g.fillStyle=C.ht;g.font='10px sans-serif';
   for(let r=10;r<=mx;r+=10){g.beginPath();g.arc(m,m,r*k,0,7);g.stroke();g.fillText(r,m+r*k+2,m-2)}
   g.beginPath();g.moveTo(m,0);g.lineTo(m,S);g.moveTo(0,m);g.lineTo(S,m);g.stroke();
   g.lineWidth=2.5;
   for(let i=0;i<pts.length-1;i++){const z=(pts[i].hgt-lv[0].hgt)/1000;
-    g.strokeStyle=z<1?'#f33':z<3?'#3d3':z<6?'#ee3':'#3dd';g.beginPath();
+    g.strokeStyle=C.hc[z<1?0:z<3?1:z<6?2:3];g.beginPath();
     g.moveTo(m+pts[i].u*k,m-pts[i].v*k);g.lineTo(m+pts[i+1].u*k,m-pts[i+1].v*k);g.stroke()}
 }
 function indices(s,pc){
@@ -245,7 +259,7 @@ function indices(s,pc){
   if(s.dgz&&s.dgz.length)add('Dendritic zone (depth)',s.dgz.map(([pb,pt])=>{const z0=HP(lv,pb),z1=HP(lv,pt);return `${Math.round(pb)}–${Math.round(pt)} mb`+(z0!=null&&z1!=null?` (${Math.round(z1-z0)} m)`:'')}).join('<br>'))
   if(s.mix){const m=s.mix;add('Mixing height AGL',`${Math.round(m.depth)} m / ${Math.round(m.depth*3.281)} ft`);
     add('Wind at mix top',`${Math.round(m.top[0])}° @ ${Math.round(m.top[1])} kt`);
-    add('Mixed-layer wind mean / max',`${m.mean.toFixed(0)} / ${m.max.toFixed(0)} kt`)}
+    add('Mixed-layer mean wind',`${Math.round(m.mean[0])}° @ ${Math.round(m.mean[1])} kt`);add('Mixed-layer max wind',`${m.max.toFixed(0)} kt`)}
   const H=p=>HP(lv,p);
   add('H1000 / 850 / 700 m',`${f(H(1000))} / ${f(H(850))} / ${f(H(700))}`);
   const t=(a,b)=>H(a)!=null&&H(b)!=null?f(H(b)-H(a)):'–';
@@ -266,7 +280,7 @@ function hover(e){
   const u=ip(lv,p,'u'),v=ip(lv,p,'v');let w='–';
   if(u!=null){const sp=Math.hypot(u,v),dr=(Math.atan2(-u,-v)*180/Math.PI+360)%360;w=`${dr.toFixed(0)}° @ ${sp.toFixed(0)} kt`}
   const zz=ip(lv,p,'hgt'),zs=zz==null?'–':`${Math.round(zz)} m / ${Math.round(zz*3.281)} ft MSL (${Math.round((zz-lv[0].hgt)*3.281)} ft AGL)`;
-  $('#ro').textContent=`${p.toFixed(0)} mb  ${zs}  T${g('t')}°C  Td ${g('td')}°C  Tw ${g('tw')}°C  wind ${w}  ω ${g('om',2)}`;
+  $('#ro').textContent=`${p.toFixed(0)} mb  ${zs}  T ${g('t')}°C  Td ${g('td')}°C  Tw ${g('tw')}°C  wind ${w}  ω ${g('om',2)}`;
 }
 let MAN=null;
 async function initPicker(){
@@ -311,5 +325,6 @@ document.addEventListener('keydown',e=>{if(!F.length||e.target.tagName=='SELECT'
 document.addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('over')});
 document.addEventListener('dragleave',()=>$('#drop').classList.remove('over'));
 document.addEventListener('drop',e=>{e.preventDefault();$('#drop').classList.remove('over');load([...e.dataTransfer.files])});
+$('#th').onclick=()=>setTheme(document.documentElement.dataset.theme=='light'?'dark':'light');
 initPicker();
 </script></body></html>
