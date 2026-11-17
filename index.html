@@ -76,6 +76,8 @@ function parse(txt){
     for(let i=0;i+sN.length<=dv.length;i+=sN.length){
       const o={};sN.forEach((k,j)=>{const v=dv[i+j];o[k]=v<=-9999?null:v});
       if(o.PRES==null||o.TMPC==null)continue;
+      if(!(o.PRES>0&&o.PRES<=1100)||o.TMPC<-150||o.TMPC>70)continue;
+      if(lev.length&&o.PRES>=lev[lev.length-1].p)continue;
       const r=Math.PI/180;
       const l={p:o.PRES,t:o.TMPC,tw:o.TMWC,td:o.DWPC,dir:o.DRCT,spd:o.SKNT,hgt:o.HGHT,om:o.OMEG};
       if(l.dir!=null&&l.spd!=null){l.u=-l.spd*Math.sin(l.dir*r);l.v=-l.spd*Math.cos(l.dir*r)}
