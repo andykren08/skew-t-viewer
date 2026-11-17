@@ -272,11 +272,16 @@ let MAN=null;
 async function initPicker(){
   try{const r=await fetch('data/manifest.json',{cache:'no-cache'});if(!r.ok)return;MAN=await r.json()}catch(e){return}
   const ms=Object.keys(MAN.models||{});if(!ms.length)return;
-  $('#st').innerHTML=MAN.stations.map(s=>`<option>${s}</option>`).join('');
   $('#md').innerHTML=ms.map(m=>`<option>${m}</option>`).join('');
+  fillSt();
   $('#pk').style.display='inline-flex';
-  $('#st').onchange=$('#md').onchange=loadRemote;
+  $('#st').onchange=loadRemote;$('#md').onchange=()=>{fillSt();loadRemote()};
   loadRemote();
+}
+function fillSt(){
+  const keep=$('#st').value,ss=MAN.models[$('#md').value].stations;
+  $('#st').innerHTML=ss.map(s=>`<option>${s}</option>`).join('');
+  if(ss.includes(keep))$('#st').value=keep;
 }
 async function loadRemote(){
   const m=$('#md').value,s=$('#st').value,mi=MAN.models[m];
@@ -299,7 +304,8 @@ $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
 ['o1','o2','o3','o4','o5','o6','o7','o8','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
 $('#sk').addEventListener('mousemove',e=>F.length&&hover(e));
-document.addEventListener('keydown',e=>{if(!F.length)return;
+document.addEventListener('keydown',e=>{if(!F.length||e.target.tagName=='SELECT')return;
+  if(e.key.startsWith('Arrow'))e.preventDefault();
   if(e.key=='ArrowRight')step(1);else if(e.key=='ArrowLeft')step(-1);
   else if(e.key=='ArrowUp'&&fi>0){fi--;$('#fs').value=fi;setF()}else if(e.key=='ArrowDown'&&fi<F.length-1){fi++;$('#fs').value=fi;setF()}});
 document.addEventListener('dragover',e=>{e.preventDefault();$('#drop').classList.add('over')});
