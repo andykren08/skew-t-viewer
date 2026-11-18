@@ -35,7 +35,7 @@ KEEP = int(os.environ.get("BUFKIT_KEEP_RUNS", "3"))   # runs kept per model
 STATIONS = [
     "KGSO", "KINT", "KRDU", "KFAY", "KRWI",
     "KIXA", "KGSB", "KRCZ", "KISO", "KPGV",
-    "KCLT", "KHKY", "KTNB", "KAVL", "KLBT",
+    "KCLT", "KHKY", "TNB", "KAVL", "LBT",
     "KDAN", "KLYH", "KROA", "KLWB", "KBLF",
     "KFLO", "KMYR", "KILM", "KMHX", "KOAJ",
 ]
