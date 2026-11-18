@@ -14,16 +14,16 @@ input[type=file]{display:none}
 #title{font-weight:600;margin-left:6px}
 #drop{margin:10px;padding:40px 20px;border:2px dashed var(--bd);border-radius:10px;text-align:center;color:var(--mu);line-height:1.7}
 #drop.over{border-color:var(--ac)}
-main{display:none;grid-template-columns:300px 1fr 190px;gap:10px;padding:10px}
+main{display:none;grid-template-columns:300px 1fr 210px;gap:10px;padding:10px}
 aside{display:flex;flex-direction:column;gap:10px}
 .card{background:var(--pn);border:1px solid var(--bd);border-radius:8px;padding:8px}
 .card h3{margin:0 0 6px;font-size:12px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 table{width:100%;border-collapse:collapse}td{padding:2px 4px}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 #sk{width:100%;height:auto;max-height:calc(100vh - 150px);background:var(--sk);border-radius:8px;display:block}
 #ro{font:12px ui-monospace,Consolas,monospace;color:var(--mu);min-height:18px;margin-top:6px}
-.ov{align-self:start;position:sticky;top:10px}.ov label{display:block;margin:5px 0}.ov select{width:100%;margin-top:6px}
+.rt{align-self:start;position:sticky;top:10px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 20px);overflow:auto}.ov label{display:block;margin:5px 0}.ov select{width:100%;margin-top:6px}#sk.zm{cursor:grab}#sk.dr{cursor:grabbing}.vb{display:flex;flex-wrap:wrap;gap:6px}.vb button{padding:4px 9px}#zs{color:var(--mu);font-size:12px;margin-top:6px;line-height:1.45}.lg{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}.lgh{display:grid;grid-template-columns:1fr 1fr;gap:0 6px}.lgh .lg{gap:5px}.lg svg{flex:none}.lg.off{opacity:.35}
 input[type=range]{flex:1;min-width:140px}
-@media(max-width:1000px){main{grid-template-columns:1fr}section{order:-1}.ov{order:-1;position:static}.ov label{display:inline-block;margin:2px 10px 2px 0}.ov select{width:auto}#ho{max-width:360px;display:block;margin:0 auto}}
+@media(max-width:1000px){main{grid-template-columns:1fr}section{order:-1}.rt{order:-1;position:static;max-height:none;overflow:visible}.ov label{display:inline-block;margin:2px 10px 2px 0}.ov select{width:auto}#ho{max-width:360px;display:block;margin:0 auto}}
 </style></head><body>
 <header>
 <label class="btn">Open .buf files<input id="fi" type="file" multiple></label>
@@ -40,7 +40,7 @@ input[type=range]{flex:1;min-width:140px}
 <div class="card"><h3>Indices</h3><table id="ix"></table></div>
 </aside>
 <section><svg id="sk" viewBox="0 0 940 720"></svg><div id="ro"></div></section>
-<div class="card ov"><h3>Overlays</h3>
+<div class="rt"><div class="card ov"><h3>Overlays</h3>
 <label><input type="checkbox" id="o1" checked> Dry adiabats</label>
 <label><input type="checkbox" id="o2" checked> Wet bulb</label>
 <label><input type="checkbox" id="o3" checked> Wind barbs</label>
@@ -50,13 +50,22 @@ input[type=range]{flex:1;min-width:140px}
 <label><input type="checkbox" id="o7" checked> Dendritic zone</label>
 <label><input type="checkbox" id="o8" checked> Momentum transfer</label>
 <select id="ps"><option value="sfc">Surface parcel</option><option value="ml">Mixed layer (100 mb)</option><option value="mu">Most unstable (300 mb)</option><option value="925">925 mb</option><option value="850">850 mb</option><option value="800">800 mb</option><option value="700">700 mb</option><option value="600">600 mb</option></select></div>
+<div class="card" id="vw"><h3>Zoom</h3>
+<div class="vb"><button id="zi" title="Zoom in (+)">＋</button><button id="zo" title="Zoom out (−)">－</button><button id="zr" title="Reset zoom (Esc or 0)">Reset</button></div>
+<div class="vb" style="margin-top:6px"><button id="z7" title="Zoom to fit the profile from the surface to 700 mb">Sfc–700 mb</button><button id="z5" title="Zoom to fit the profile from the surface to 500 mb">Sfc–500 mb</button></div>
+<div id="zs"></div></div>
+<div class="card"><h3>Legend</h3><div id="lg"></div></div>
+</div>
 </main>
 <script>
 const $=s=>document.querySelector(s), lp=Math.log;
 const W=940,H=720,M={l:46,r:70,t:12,b:24},PW=W-M.l-M.r,PH=H-M.t-M.b,P0=1050,P1=100;
-const Y=p=>M.t+(lp(p)-lp(P1))/(lp(P0)-lp(P1))*PH;
-const X=(T,p)=>M.l+(T+40)/90*PW+(M.t+PH-Y(p));
-const PI=y=>Math.exp(lp(P1)+(y-M.t)/PH*(lp(P0)-lp(P1)));
+const Yf=p=>M.t+(lp(p)-lp(P1))/(lp(P0)-lp(P1))*PH;
+const Xf=(T,p)=>M.l+(T+40)/90*PW+(M.t+PH-Yf(p));
+const Z={k:1,ox:0,oy:0};   // zoom factor and pan offset (in full-diagram pixels)
+const Y=p=>M.t+(Yf(p)-M.t-Z.oy)*Z.k;
+const X=(T,p)=>M.l+(Xf(T,p)-M.l-Z.ox)*Z.k;
+const PI=y=>{const yf=M.t+Z.oy+(y-M.t)/Z.k;return Math.exp(lp(P1)+(yf-M.t)/PH*(lp(P0)-lp(P1)))};
 let F=[],fi=0,ti=0,timer=null;
 const TH={
   dark:{bg:'#000',iso:'#1b2670',iso0:'#3a7bff',dry:'#0b6b6b',prs:'#555',wb:'#27d3e0',td:'#22e822',t:'#ff2020',ax:'#ccc',hgt:'#e8c34a',rh:'#fff',rhOp:.45,barb:'#fff',barbS:'#e8c34a',parc:'#ffd400',mix:'#f2f2f2',lab:'#fff',xh:'#fff',hb:'#000',hg:'#333',ht:'#777',hc:['#f33','#3d3','#ee3','#3dd']},
@@ -192,16 +201,18 @@ function mixing(lv){
 }
 function draw(){
   const f=F[fi],s=f.times[ti],lv=s.lev,h0=lv[0].hgt;
+  const tStep=Z.k>=6?2:Z.k>=3?5:10,pStep=Z.k>=6?10:Z.k>=3?25:Z.k>=1.8?50:100,PL=[];
+  for(let p=1000;p>=100;p-=pStep)PL.push(p);
   let h=`<defs><clipPath id="c"><rect x="${M.l}" y="${M.t}" width="${PW}" height="${PH}"/></clipPath></defs><rect width="${W}" height="${H}" fill="${C.bg}"/><g clip-path="url(#c)">`;
   if($('#o5').checked)for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1];
     const rl=l=>l.td==null?0:es(l.td)/es(l.t)*100,ri=l=>l.td==null||l.t>=0?0:es(l.td)/esi(l.t)*100;
     const c=(rl(a)>=95&&rl(b)>=95)||(ri(a)>=95&&ri(b)>=95)?C.rh:null;
     if(c)h+=`<rect x='${M.l}' y='${Y(b.p)}' width='${PW}' height='${Y(a.p)-Y(b.p)}' fill='${c}' fill-opacity='${C.rhOp}'/>`}
-  for(let T=-150;T<=50;T+=10)h+=ln(X(T,P0),Y(P0),X(T,P1),Y(P1),T==0?C.iso0:C.iso,T==0?1.6:1);
+  for(let T=-150;T<=60;T+=tStep)h+=ln(X(T,P0),Y(P0),X(T,P1),Y(P1),T==0?C.iso0:C.iso,T==0?1.6:1);
   if($('#o1').checked)for(let th=250;th<=600;th+=10){const pts=[];
     for(let p=P0;p>=P1;p-=25)pts.push(X(th*Math.pow(p/1000,.2857)-273.15,p).toFixed(1)+','+Y(p).toFixed(1));
     h+=pl(pts,C.dry,1,'4 4')}
-  for(const p of [1000,900,800,700,600,500,400,300,200,100])h+=ln(M.l,Y(p),M.l+PW,Y(p),C.prs,1,'2 3');
+  for(const p of PL)h+=ln(M.l,Y(p),M.l+PW,Y(p),C.prs,1,'2 3');
   if($('#o2').checked)h+=pl(lv.filter(l=>l.tw!=null).map(l=>X(l.tw,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),C.wb,1.5,'5 3');
   h+=pl(lv.filter(l=>l.td!=null).map(l=>X(l.td,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),C.td,2.5);
   h+=pl(lv.map(l=>X(l.t,l.p).toFixed(1)+','+Y(l.p).toFixed(1)),C.t,2.5);
@@ -225,10 +236,11 @@ function draw(){
     const lab=(p,w,dy)=>w[0]==null?'':`<text x='${tp(p)+10}' y='${Y(p)+dy}' fill='${C.lab}' font-size='12'>→ ${Math.round(w[0])}° ${Math.round(w[1])} kt</text>`;
     h+=lab(mx.ptop,mx.top,4)+lab(mx.pm,mx.mean,Y(mx.pm)-Y(mx.ptop)<18?16:4)}
   h+=`</g>`;
-  for(const p of [1000,900,800,700,600,500,400,300,200,100]){
-    h+=`<text x="${M.l-4}" y="${Y(p)+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
-    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${Y(p)-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m</text>`}}
-  for(let T=-40;T<=50;T+=10)h+=`<text x="${X(T,P0)}" y="${H-8}" fill="${C.ax}" font-size="12" text-anchor="middle">${T}</text>`;
+  for(const p of PL){const yy=Y(p);if(yy<M.t+6||yy>M.t+PH-2)continue;
+    h+=`<text x="${M.l-4}" y="${yy+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
+    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${yy-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m</text>`}}
+  {const pB=PI(M.t+PH);for(let T=-150;T<=60;T+=tStep){const x=X(T,pB);if(x<M.l-1||x>M.l+PW+1)continue;
+    h+=`<text x="${x}" y="${H-8}" fill="${C.ax}" font-size="12" text-anchor="middle">${T}</text>`}}
   if($('#o3').checked){let last=1e9;
     for(const l of lv){const y=Y(l.p);if(l.dir==null||y<M.t||y>M.t+PH||Math.abs(y-last)<16)continue;last=y;
       const c=l.spd>=50?C.barbS:C.barb;h+=`<g>${barb(W-34,y,l.dir,l.spd,c)}</g>`}}
@@ -236,7 +248,47 @@ function draw(){
   $('#sk').innerHTML=h;
   const dt=new Date(s.d),fh=Math.round((s.d-f.times[0].d)/36e5);
   $('#title').textContent=`${f.stid} ${dt.toUTCString().slice(5,22)} UTC (F${String(fh).padStart(3,'0')}) · ${dt.toLocaleString([],{weekday:'short',month:'numeric',day:'numeric',hour:'numeric',timeZoneName:'short'})}`;
-  hodo(lv);indices(s,pc);ptype(lv);
+  hodo(lv);indices(s,pc);ptype(lv);zui();
+}
+function zclamp(){
+  Z.k=Math.min(10,Math.max(1,Z.k));
+  if(Z.k<1.02){Z.k=1;Z.ox=0;Z.oy=0;return}
+  Z.ox=Math.min(PW*(1-1/Z.k),Math.max(0,Z.ox));Z.oy=Math.min(PH*(1-1/Z.k),Math.max(0,Z.oy));
+}
+let raf=0;
+function zdraw(){zclamp();if(!F.length||raf)return;raf=requestAnimationFrame(()=>{raf=0;draw()})}
+function zoomAt(sx,sy,f){
+  const k0=Z.k,k1=Math.min(10,Math.max(1,k0*f));if(k1===k0)return;
+  const fx=Z.ox+(sx-M.l)/k0,fy=Z.oy+(sy-M.t)/k0;
+  Z.k=k1;Z.ox=fx-(sx-M.l)/k1;Z.oy=fy-(sy-M.t)/k1;zdraw();
+}
+function zoomCenter(f){if(F.length)zoomAt(M.l+PW/2,M.t+PH/2,f)}
+function zoomReset(){Z.k=1;Z.ox=0;Z.oy=0;zdraw()}
+function zoomFit(pTop){
+  if(!F.length)return;const lv=F[fi].times[ti].lev;
+  const yb=Yf(lv[0].p)-M.t,yt=Yf(pTop)-M.t;let x0=1e9,x1=-1e9;
+  lv.filter(l=>l.p>=pTop).forEach(l=>[l.t,l.td].forEach(T=>{if(T!=null){const x=Xf(T,l.p)-M.l;x0=Math.min(x0,x);x1=Math.max(x1,x)}}));
+  if(x0>x1)return;
+  const hh=(yb-yt)+20,ww=(x1-x0)+48;
+  Z.k=Math.min(10,Math.max(1,Math.min(PH/hh,PW/ww)));
+  Z.ox=(x0+x1)/2-PW/(2*Z.k);Z.oy=(yb+yt)/2-PH/(2*Z.k);zdraw();
+}
+function zui(){
+  $('#sk').classList.toggle('zm',Z.k>1);
+  $('#zs').innerHTML=Z.k>1?`Zoom ${Z.k.toFixed(1)}× · ${Math.round(PI(M.t+PH))}–${Math.round(PI(M.t))} mb in view<br>Drag to pan · double-click or Esc to reset`:'Mouse wheel to zoom, drag to pan.<br>Double-click or Esc to reset.';
+  legend();
+}
+function legend(){
+  const on=id=>$('#'+id).checked;
+  const sw=(kind,c,op)=>kind=='fill'
+    ?`<svg width="30" height="12"><rect x="1" y="1" width="28" height="10" fill="${c}" fill-opacity="${op}" stroke="${c}" stroke-opacity=".6"/></svg>`
+    :`<svg width="30" height="12"><line x1="1" y1="6" x2="29" y2="6" stroke="${c}" stroke-width="${kind=='thick'?5:kind=='line'?2.5:2}"${kind=='dash'?' stroke-dasharray="5 3"':''}/></svg>`;
+  const items=[['line',C.t,1,'Temperature'],['line',C.td,1,'Dewpoint'],['dash',C.wb,1,'Wet bulb','o2'],['dash',C.parc,1,'Parcel trace','o6'],
+    ['fill','#ff3030',.35,'CAPE','o6'],['fill','#3a7bff',.4,'CIN','o6'],['thick','#ff5ad8',1,'Dendritic zone (−12 to −18°C)','o7'],
+    ['thick',C.mix,1,'Mixed layer (momentum transfer)','o8'],['fill',C.rh,C.rhOp,'RH ≥ 95% (cloud layer)','o5'],['dash',C.dry,1,'Dry adiabats','o1'],['line',C.iso0,1,'0°C isotherm']];
+  $('#lg').innerHTML=items.map(([k,c,op,n,id])=>`<div class="lg${id&&!on(id)?' off':''}">${sw(k,c,op)}<span>${n}</span></div>`).join('')
+    +`<div style="margin:8px 0 2px;color:var(--mu);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Hodograph height AGL</div>`
+    +`<div class="lgh">`+['0–1 km','1–3 km','3–6 km','6–9 km'].map((n,i)=>`<div class="lg">${sw('line',C.hc[i]).replace('width="30"','width="20"').replace('x2="29"','x2="19"')}<span>${n}</span></div>`).join('')+`</div>`;
 }
 function hodo(lv){
   const c=$('#ho'),g=c.getContext('2d'),S=c.width,m=S/2;g.fillStyle=C.hb;g.fillRect(0,0,S,S);
@@ -318,8 +370,23 @@ $('#tr').oninput=e=>{ti=+e.target.value;draw()};
 $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
 ['o1','o2','o3','o4','o5','o6','o7','o8','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
-$('#sk').addEventListener('mousemove',e=>F.length&&hover(e));
+const sk=$('#sk');let drag=null;
+const svgPt=e=>{const pt=sk.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(sk.getScreenCTM().inverse())};
+const inPlot=q=>q.x>=M.l&&q.x<=M.l+PW&&q.y>=M.t&&q.y<=M.t+PH;
+sk.addEventListener('mousemove',e=>F.length&&!drag&&hover(e));
+sk.addEventListener('wheel',e=>{if(!F.length)return;const q=svgPt(e);if(!inPlot(q)||(e.deltaY>0&&Z.k<=1))return;
+  e.preventDefault();zoomAt(q.x,q.y,e.deltaY<0?1.25:0.8)},{passive:false});
+sk.addEventListener('mousedown',e=>{if(e.button!==0||Z.k<=1||!F.length)return;const q=svgPt(e);if(!inPlot(q))return;
+  drag={x:q.x,y:q.y,ox:Z.ox,oy:Z.oy};sk.classList.add('dr');e.preventDefault()});
+window.addEventListener('mousemove',e=>{if(!drag)return;const q=svgPt(e);Z.ox=drag.ox-(q.x-drag.x)/Z.k;Z.oy=drag.oy-(q.y-drag.y)/Z.k;zdraw()});
+window.addEventListener('mouseup',()=>{if(drag){drag=null;sk.classList.remove('dr')}});
+sk.addEventListener('dblclick',()=>F.length&&zoomReset());
+$('#zi').onclick=()=>zoomCenter(1.5);$('#zo').onclick=()=>zoomCenter(1/1.5);$('#zr').onclick=zoomReset;
+$('#z7').onclick=()=>zoomFit(700);$('#z5').onclick=()=>zoomFit(500);
 document.addEventListener('keydown',e=>{if(!F.length||e.target.tagName=='SELECT')return;
+  if(e.key=='Escape'||e.key=='0'){zoomReset();return}
+  if(e.key=='+'||e.key=='='){zoomCenter(1.25);return}
+  if(e.key=='-'){zoomCenter(.8);return}
   if(e.key.startsWith('Arrow'))e.preventDefault();
   if(e.key=='ArrowRight')step(1);else if(e.key=='ArrowLeft')step(-1);
   else if(e.key=='ArrowUp'&&fi>0){fi--;$('#fs').value=fi;setF()}else if(e.key=='ArrowDown'&&fi<F.length-1){fi++;$('#fs').value=fi;setF()}});
