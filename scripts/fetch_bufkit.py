@@ -26,13 +26,12 @@ BASE = os.environ.get("BUFKIT_BASE", "https://meteor.geol.iastate.edu/data/bufki
 STATIONS = [
     "KRDU", "KGSO", "KINT", "KFAY", "KRWI",
     "KGSB", "KIXA", "KRCZ", "KECG", "KHAT",
-    "KEWN", "KHKY", "KMHX", "KILM", "KLBT",
+    "KEWN", "KHKY", "KMHX", "KILM", "KSBY",
     "KOAJ", "KCLT", "KAVL", "KFVX", "KFLO",
     "KMYR", "KCHS", "KCAE", "KAGS", "KGSP",
     "KATL", "KTRI", "KISO", "KDAN", "KLYH",
     "KROA", "KBLF", "KLWB", "KPGV", "KSSC",
-    "KCHO", "KIAD", "KORF", "KPHF", "KRIC",
-    "KSBY", "KHSP", "KWAL",
+    "KCHO", "KIAD", "KORF", "KPHF",
 ]
 
 # Base address of the published site, set by the workflow. When a model has no
