@@ -33,15 +33,11 @@ KEEP = int(os.environ.get("BUFKIT_KEEP_RUNS", "3"))   # runs kept per model
 
 # Raleigh first, then the rest. A station a model doesn't carry is skipped.
 STATIONS = [
-    "KRDU", "KGSO", "KINT", "KFAY", "KRWI",
-    "KGSB", "KIXA", "KRCZ", "KECG", "KHAT",
-    "KEWN", "KHKY", "KMHX", "KILM", "KLBT",
-    "KOAJ", "KCLT", "KAVL", "KFVX", "KFLO",
-    "KMYR", "KCHS", "KCAE", "KAGS", "KGSP",
-    "KATL", "KTRI", "KISO", "KDAN", "KLYH",
-    "KROA", "KBLF", "KLWB", "KPGV", "KSSC",
-    "KCHO", "KIAD", "KORF", "KPHF", "KRIC",
-    "KSBY", "KHSP", "KWAL",
+    "KGSO", "KINT", "KRDU", "KFAY", "KRWI",
+    "KIXA", "KGSB", "KRCZ", "KISO", "KPGV",
+    "KCLT", "KHKY", "KTNB", "KAVL", "KLBT",
+    "KDAN", "KLYH", "KROA", "KLWB", "KBLF",
+    "KFLO", "KMYR", "KILM", "KMHX", "KOAJ",
 ]
 
 # Base address of the published site, set by the workflow. Files already there
