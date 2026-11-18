@@ -52,7 +52,7 @@ input[type=range]{flex:1;min-width:140px}
 <select id="ps"><option value="sfc">Surface parcel</option><option value="ml">Mixed layer (100 mb)</option><option value="mu">Most unstable (300 mb)</option><option value="925">925 mb</option><option value="850">850 mb</option><option value="800">800 mb</option><option value="700">700 mb</option><option value="600">600 mb</option></select></div>
 <div class="card" id="vw"><h3>Zoom</h3>
 <div class="vb"><button id="zi" title="Zoom in (+)">＋</button><button id="zo" title="Zoom out (−)">－</button><button id="zr" title="Reset zoom (Esc or 0)">Reset</button></div>
-<div class="vb" style="margin-top:6px"><button id="z7" title="Zoom so the surface up to 700 mb fills the plot">Sfc–700 mb</button><button id="z5" title="Zoom so the surface up to 500 mb fills the plot">Sfc–500 mb</button></div>
+<div class="vb" style="margin-top:6px"><button id="z7" title="Zoom to fit the profile from the surface to 700 mb">Sfc–700 mb</button><button id="z5" title="Zoom to fit the profile from the surface to 500 mb">Sfc–500 mb</button></div>
 <div id="zs"></div></div>
 <div class="card"><h3>Legend</h3><div id="lg"></div></div>
 </div>
@@ -62,9 +62,9 @@ const $=s=>document.querySelector(s), lp=Math.log;
 const W=940,H=720,M={l:46,r:70,t:12,b:24},PW=W-M.l-M.r,PH=H-M.t-M.b,P0=1050,P1=100;
 const Yf=p=>M.t+(lp(p)-lp(P1))/(lp(P0)-lp(P1))*PH;
 const Xf=(T,p)=>M.l+(T+40)/90*PW+(M.t+PH-Yf(p));
-const Z={k:1,oy:0};   // vertical zoom factor and vertical pan offset (full-diagram pixels)
+const Z={k:1,ox:0,oy:0};   // zoom factor and pan offset (in full-diagram pixels)
 const Y=p=>M.t+(Yf(p)-M.t-Z.oy)*Z.k;
-const X=(T,p)=>Xf(T,p);   // x positions never change with zoom, so the profile stays in view
+const X=(T,p)=>M.l+(Xf(T,p)-M.l-Z.ox)*Z.k;
 const PI=y=>{const yf=M.t+Z.oy+(y-M.t)/Z.k;return Math.exp(lp(P1)+(yf-M.t)/PH*(lp(P0)-lp(P1)))};
 let F=[],fi=0,ti=0,timer=null;
 const TH={
@@ -201,7 +201,7 @@ function mixing(lv){
 }
 function draw(){
   const f=F[fi],s=f.times[ti],lv=s.lev,h0=lv[0].hgt;
-  const tStep=Z.k>=3?5:10,pStep=Z.k>=6?10:Z.k>=3?25:Z.k>=1.8?50:100,PL=[];
+  const tStep=Z.k>=6?2:Z.k>=3?5:10,pStep=Z.k>=6?10:Z.k>=3?25:Z.k>=1.8?50:100,PL=[];
   for(let p=1000;p>=100;p-=pStep)PL.push(p);
   let h=`<defs><clipPath id="c"><rect x="${M.l}" y="${M.t}" width="${PW}" height="${PH}"/></clipPath></defs><rect width="${W}" height="${H}" fill="${C.bg}"/><g clip-path="url(#c)">`;
   if($('#o5').checked)for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1];
@@ -251,27 +251,31 @@ function draw(){
   hodo(lv);indices(s,pc);ptype(lv);zui();
 }
 function zclamp(){
-  Z.k=Math.min(12,Math.max(1,Z.k));
-  if(Z.k<1.02){Z.k=1;Z.oy=0;return}
-  Z.oy=Math.min(PH*(1-1/Z.k),Math.max(0,Z.oy));
+  Z.k=Math.min(10,Math.max(1,Z.k));
+  if(Z.k<1.02){Z.k=1;Z.ox=0;Z.oy=0;return}
+  Z.ox=Math.min(PW*(1-1/Z.k),Math.max(0,Z.ox));Z.oy=Math.min(PH*(1-1/Z.k),Math.max(0,Z.oy));
 }
 let raf=0;
 function zdraw(){zclamp();if(!F.length||raf)return;raf=requestAnimationFrame(()=>{raf=0;draw()})}
-function zoomAt(sy,f){   // zoom up/down around screen height sy
-  const k0=Z.k,k1=Math.min(12,Math.max(1,k0*f));if(k1===k0)return;
-  const fy=Z.oy+(sy-M.t)/k0;
-  Z.k=k1;Z.oy=fy-(sy-M.t)/k1;zdraw();
+function zoomAt(sx,sy,f){
+  const k0=Z.k,k1=Math.min(10,Math.max(1,k0*f));if(k1===k0)return;
+  const fx=Z.ox+(sx-M.l)/k0,fy=Z.oy+(sy-M.t)/k0;
+  Z.k=k1;Z.ox=fx-(sx-M.l)/k1;Z.oy=fy-(sy-M.t)/k1;zdraw();
 }
-function zoomCenter(f){if(F.length)zoomAt(M.t+PH/2,f)}
-function zoomReset(){Z.k=1;Z.oy=0;zdraw()}
-function zoomFit(pTop){   // surface up to pTop fills the plot height
+function zoomCenter(f){if(F.length)zoomAt(M.l+PW/2,M.t+PH/2,f)}
+function zoomReset(){Z.k=1;Z.ox=0;Z.oy=0;zdraw()}
+function zoomFit(pTop){
   if(!F.length)return;const lv=F[fi].times[ti].lev;
-  const yb=Yf(lv[0].p)-M.t,yt=Yf(pTop)-M.t,hh=(yb-yt)+24;
-  Z.k=Math.min(12,Math.max(1,PH/hh));Z.oy=yt-12;zdraw();
+  const yb=Yf(lv[0].p)-M.t,yt=Yf(pTop)-M.t;let x0=1e9,x1=-1e9;
+  lv.filter(l=>l.p>=pTop).forEach(l=>[l.t,l.td].forEach(T=>{if(T!=null){const x=Xf(T,l.p)-M.l;x0=Math.min(x0,x);x1=Math.max(x1,x)}}));
+  if(x0>x1)return;
+  const hh=(yb-yt)+20,ww=(x1-x0)+48;
+  Z.k=Math.min(10,Math.max(1,Math.min(PH/hh,PW/ww)));
+  Z.ox=(x0+x1)/2-PW/(2*Z.k);Z.oy=(yb+yt)/2-PH/(2*Z.k);zdraw();
 }
 function zui(){
   $('#sk').classList.toggle('zm',Z.k>1);
-  $('#zs').innerHTML=Z.k>1?`Zoom ${Z.k.toFixed(1)}× · ${Math.round(PI(M.t+PH))}–${Math.round(PI(M.t))} mb in view<br>Drag up/down to pan · double-click or Esc to reset`:'Mouse wheel zooms up/down, drag pans up/down.<br>Double-click or Esc to reset.';
+  $('#zs').innerHTML=Z.k>1?`Zoom ${Z.k.toFixed(1)}× · ${Math.round(PI(M.t+PH))}–${Math.round(PI(M.t))} mb in view<br>Drag to pan · double-click or Esc to reset`:'Mouse wheel to zoom, drag to pan.<br>Double-click or Esc to reset.';
   legend();
 }
 function legend(){
@@ -388,10 +392,10 @@ const svgPt=e=>{const pt=sk.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;retur
 const inPlot=q=>q.x>=M.l&&q.x<=M.l+PW&&q.y>=M.t&&q.y<=M.t+PH;
 sk.addEventListener('mousemove',e=>F.length&&!drag&&hover(e));
 sk.addEventListener('wheel',e=>{if(!F.length)return;const q=svgPt(e);if(!inPlot(q)||(e.deltaY>0&&Z.k<=1))return;
-  e.preventDefault();zoomAt(q.y,e.deltaY<0?1.25:0.8)},{passive:false});
+  e.preventDefault();zoomAt(q.x,q.y,e.deltaY<0?1.25:0.8)},{passive:false});
 sk.addEventListener('mousedown',e=>{if(e.button!==0||Z.k<=1||!F.length)return;const q=svgPt(e);if(!inPlot(q))return;
-  drag={y:q.y,oy:Z.oy};sk.classList.add('dr');e.preventDefault()});
-window.addEventListener('mousemove',e=>{if(!drag)return;const q=svgPt(e);Z.oy=drag.oy-(q.y-drag.y)/Z.k;zdraw()});
+  drag={x:q.x,y:q.y,ox:Z.ox,oy:Z.oy};sk.classList.add('dr');e.preventDefault()});
+window.addEventListener('mousemove',e=>{if(!drag)return;const q=svgPt(e);Z.ox=drag.ox-(q.x-drag.x)/Z.k;Z.oy=drag.oy-(q.y-drag.y)/Z.k;zdraw()});
 window.addEventListener('mouseup',()=>{if(drag){drag=null;sk.classList.remove('dr')}});
 sk.addEventListener('dblclick',()=>F.length&&zoomReset());
 $('#zi').onclick=()=>zoomCenter(1.5);$('#zo').onclick=()=>zoomCenter(1/1.5);$('#zr').onclick=zoomReset;
