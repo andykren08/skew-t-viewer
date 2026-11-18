@@ -307,7 +307,8 @@ async function loadRemote(){
     if(keep!=null){let b=1e18;d.times.forEach((t,i)=>{const x=Math.abs(t.d-keep);if(x<b){b=x;ti=i}})}
     $('#fs').innerHTML=`<option value="0">${d.name}</option>`;
     $('#drop').style.display='none';$('#mn').style.display='grid';setF();
-    $('#cyc').textContent=mi&&mi.init?`Init ${new Date(mi.init).toUTCString().slice(5,22)} UTC`:'';
+    const it=mi&&((mi.inits&&mi.inits[s])||mi.init);
+    $('#cyc').textContent=it?`Init ${new Date(it).toUTCString().slice(5,22)} UTC`:'';
   }catch(e){$('#cyc').textContent=`No data for ${m} ${s}`}
 }
 function step(d){const n=F[fi].times.length;ti=(ti+d+n)%n;$('#tr').value=ti;draw()}
