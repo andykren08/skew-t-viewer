@@ -30,7 +30,7 @@ input[type=range]{flex:1;min-width:140px}
 <span id="pk" style="display:none;gap:6px;align-items:center"><select id="st"></select><select id="md"></select><select id="rn" title="Model run"></select><span id="cyc" style="color:var(--mu)"></span></span>
 <select id="fs"></select>
 <button id="pv">◀</button><input id="tr" type="range" min="0" max="0" value="0"><button id="nx">▶</button><button id="pl">Play</button>
-<span id="title"></span><button id="th" title="Switch light / dark" style="margin-left:auto">◐ Theme</button>
+<span id="title"></span><span id="upd" style="color:var(--mu);font-size:12px;margin-left:10px" title="When the data files on this site were last refreshed"></span><button id="th" title="Switch light / dark" style="margin-left:auto">◐ Theme</button>
 </header>
 <div id="drop">Drag and drop one or more BUFKIT .buf files here, or use “Open .buf files.”<br>Files stay in your browser; nothing is uploaded.<br>Arrow keys: ←/→ change forecast hour, ↑/↓ change file.</div>
 <main id="mn">
@@ -347,7 +347,26 @@ async function initPicker(){
   $('#st').onchange=loadRemote;
   $('#rn').onchange=()=>{fillSt();loadRemote()};
   $('#md').onchange=()=>{fillRuns();fillSt();loadRemote()};
-  loadRemote();
+  loadRemote();updLabel();
+  setInterval(updLabel,30000);setInterval(refreshData,300000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshData()});
+}
+function updLabel(){   // "Data updated 14:20 EST · 18 min ago"
+  const el=$('#upd');if(!MAN||!MAN.updated){el.textContent='';return}
+  const t=new Date(MAN.updated),mins=Math.max(0,Math.round((Date.now()-t)/60000));
+  const ago=mins<60?`${mins} min ago`:`${Math.floor(mins/60)} h ${mins%60} min ago`;
+  const loc=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
+  el.textContent=`Data updated ${loc} · ${ago}`;el.style.color=mins>150?'var(--bad,#d9534f)':'var(--mu)';
+}
+async function refreshData(){   // re-read the manifest; if the site has new data, update the lists and reload the open sounding
+  let m;try{const r=await fetch('data/manifest.json',{cache:'no-cache'});if(!r.ok)return;m=await r.json()}catch(e){return}
+  if(!m||!m.models||(MAN&&m.updated===MAN.updated))return;
+  const md=$('#md').value;MAN=m;
+  const ms=Object.keys(MAN.models).filter(x=>(MAN.models[x].runs||[]).length);if(!ms.length)return;
+  $('#md').innerHTML=ms.map(x=>`<option>${x}</option>`).join('');
+  if(ms.includes(md))$('#md').value=md;
+  fillRuns();fillSt();updLabel();
+  if(F[0]&&F[0].remote)loadRemote();   // not when the user dropped in their own files
 }
 function fillRuns(){   // stay on "latest" when it was selected, otherwise keep the same run time if the model has it
   const sel=$('#rn'),keep=sel.value,wasLatest=sel.selectedIndex<=0,rs=runList();
@@ -373,7 +392,7 @@ async function loadRemote(){
     const r=await fetch(`data/${m}/${rn.id}/${s}.buf.gz`,{cache:'no-cache'});if(!r.ok)throw 0;
     const d=parse(await gunzip(r));if(!d.times.length)throw 0;
     const keep=F[fi]&&F[fi].times[ti]?F[fi].times[ti].d:null;
-    d.name=`${m} ${s} ${runLabel(rn.init).slice(0,3)}`;F=[d];fi=0;ti=0;
+    d.name=`${m} ${s} ${runLabel(rn.init).slice(0,3)}`;d.remote=true;F=[d];fi=0;ti=0;
     if(keep!=null){let b=1e18;d.times.forEach((t,i)=>{const x=Math.abs(t.d-keep);if(x<b){b=x;ti=i}})}
     $('#fs').innerHTML=`<option value="0">${d.name}</option>`;
     $('#drop').style.display='none';$('#mn').style.display='grid';setF();
