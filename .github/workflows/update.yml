@@ -2,7 +2,7 @@ name: Update BUFKIT data and deploy
 
 on:
   schedule:
-    - cron: "20,50 * * *"   # hourly at :20 UTC; edit to taste
+    - cron: "20,50 * * * *"   # hourly at :20 UTC; edit to taste
   workflow_dispatch:        # lets you run it by hand from the Actions tab
   push:
     branches: [main]
