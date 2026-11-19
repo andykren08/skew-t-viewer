@@ -302,11 +302,18 @@ function hodo(lv){
     g.strokeStyle=C.hc[z<1?0:z<3?1:z<6?2:3];g.beginPath();
     g.moveTo(m+pts[i].u*k,m-pts[i].v*k);g.lineTo(m+pts[i+1].u*k,m-pts[i+1].v*k);g.stroke()}
 }
+function pwat(lv){   // precipitable water, surface to the top of the sounding: (1/g) * integral of q dp, trapezoids in pressure
+  const L=lv.filter(l=>l.td!=null&&l.p>0);if(L.length<2)return null;let s=0;
+  for(let i=0;i<L.length-1;i++){const a=L[i],b=L[i+1],qa=mr(a.td,a.p),qb=mr(b.td,b.p);
+    s+=((qa/(1+qa)+qb/(1+qb))/2)*(a.p-b.p)*100}
+  return s/9.80665;   // kg/m2 = mm
+}
 function indices(s,pc){
   const lv=s.lev,st=s.st,r=[];
   const add=(a,b)=>r.push(`<tr><td>${a}</td><td>${b}</td></tr>`),f=(v,d=0)=>v==null?'–':(+v).toFixed(d);
-  for(const [k,n,d] of [['CAPE','CAPE J/kg',0],['CINS','CIN J/kg',0],['LCLP','LCL mb',0],['PWAT','PWAT mm',1],['KINX','K index',0],['TOTL','Total totals',0],['SHOW','Showalter',1],['LIFT','Lifted idx',1]])
+  for(const [k,n,d] of [['CAPE','CAPE J/kg',0],['CINS','CIN J/kg',0],['LCLP','LCL mb',0],['KINX','K index',0],['TOTL','Total totals',0],['SHOW','Showalter',1],['LIFT','Lifted idx',1]])
     if(k in st)add(n,f(st[k],d));
+  {const w=pwat(lv);if(w!=null)add('PWAT in / mm',`${f(w/25.4,2)} / ${f(w,1)}`)}
   if(pc){add(`${$('#ps').selectedOptions[0].text}: CAPE / CIN`,`${f(pc.cape)} / ${f(pc.cin)}`);add('LCL / LFC / EL mb',[pc.lcl,pc.lfc,pc.el].map(v=>v==null?'–':Math.round(v)).join(' / '))}
   if(s.dgz&&s.dgz.length)add('Dendritic zone (depth)',s.dgz.map(([pb,pt])=>{const z0=HP(lv,pb),z1=HP(lv,pt);return `${Math.round(pb)}–${Math.round(pt)} mb`+(z0!=null&&z1!=null?` (${Math.round(z1-z0)} m)`:'')}).join('<br>'))
   if(s.mix){const m=s.mix;add('Mixing height AGL',`${Math.round(m.depth)} m / ${Math.round(m.depth*3.281)} ft`);
