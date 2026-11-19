@@ -2,8 +2,8 @@ name: Update BUFKIT data and deploy
 
 on:
   schedule:
-    - cron: "20,50 * * * *"   # hourly at :20 UTC; edit to taste
-  workflow_dispatch:        # lets you run it by hand from the Actions tab
+    - cron: "22,55 * * * *"   # hourly at :20 and :50 UTC
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
   push:
     branches: [main]
 
@@ -24,15 +24,20 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      
       - name: Build site folder
         run: |
           mkdir -p site
           cp index.html site/
+          
       - name: Download latest BUFKIT files
         run: python3 scripts/fetch_bufkit.py site/data
+        
       - uses: actions/configure-pages@v5
+      
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+          
       - id: deployment
         uses: actions/deploy-pages@v4
