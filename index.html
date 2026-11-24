@@ -49,6 +49,8 @@ input[type=range]{flex:1;min-width:140px}
 <label><input type="checkbox" id="o6" checked> Parcel</label>
 <label><input type="checkbox" id="o7" checked> Dendritic zone</label>
 <label><input type="checkbox" id="o8" checked> Momentum transfer</label>
+<label><input type="checkbox" id="o9" checked> Omega (Pa/s)</label>
+<label><input type="checkbox" id="o10" checked> Hover parcel</label>
 <select id="ps"><option value="sfc">Surface parcel</option><option value="ml">Mixed layer (100 mb)</option><option value="mu">Most unstable (300 mb)</option><option value="925">925 mb</option><option value="850">850 mb</option><option value="800">800 mb</option><option value="700">700 mb</option><option value="600">600 mb</option></select></div>
 <div class="card" id="vw"><h3>Zoom</h3>
 <div class="vb"><button id="zi" title="Zoom in (+)">＋</button><button id="zo" title="Zoom out (−)">－</button><button id="zr" title="Reset zoom (Esc or 0)">Reset</button></div>
@@ -68,8 +70,8 @@ const X=(T,p)=>M.l+(Xf(T,p)-M.l-Z.ox)*Z.k;
 const PI=y=>{const yf=M.t+Z.oy+(y-M.t)/Z.k;return Math.exp(lp(P1)+(yf-M.t)/PH*(lp(P0)-lp(P1)))};
 let F=[],fi=0,ti=0,timer=null;
 const TH={
-  dark:{bg:'#000',iso:'#1b2670',iso0:'#3a7bff',dry:'#0b6b6b',prs:'#555',wb:'#27d3e0',td:'#22e822',t:'#ff2020',ax:'#ccc',hgt:'#e8c34a',rh:'#fff',rhOp:.45,barb:'#fff',barbS:'#e8c34a',parc:'#ffd400',mix:'#f2f2f2',lab:'#fff',xh:'#fff',hb:'#000',hg:'#333',ht:'#777',hc:['#f33','#3d3','#ee3','#3dd']},
-  light:{bg:'#fff',iso:'#c3cdf0',iso0:'#2456d6',dry:'#8cc3bb',prs:'#9aa1ad',wb:'#0a95a3',td:'#0b9a0b',t:'#d41414',ax:'#222',hgt:'#8a6200',rh:'#6f8fc4',rhOp:.3,barb:'#111',barbS:'#8a4a00',parc:'#c26a00',mix:'#111',lab:'#111',xh:'#000',hb:'#fff',hg:'#d0d4da',ht:'#666',hc:['#d11','#0a0','#b09500','#08a']}};
+  dark:{bg:'#000',iso:'#1b2670',iso0:'#3a7bff',dry:'#0b6b6b',prs:'#555',wb:'#27d3e0',td:'#22e822',t:'#ff2020',ax:'#ccc',hgt:'#e8c34a',rh:'#fff',rhOp:.45,barb:'#fff',barbS:'#e8c34a',parc:'#ffd400',mix:'#f2f2f2',om:'#fff',hp:'#ff7bd5',lab:'#fff',xh:'#fff',hb:'#000',hg:'#333',ht:'#777',hc:['#f33','#3d3','#ee3','#3dd']},
+  light:{bg:'#fff',iso:'#c3cdf0',iso0:'#2456d6',dry:'#8cc3bb',prs:'#9aa1ad',wb:'#0a95a3',td:'#0b9a0b',t:'#d41414',ax:'#222',hgt:'#8a6200',rh:'#6f8fc4',rhOp:.3,barb:'#111',barbS:'#8a4a00',parc:'#c26a00',mix:'#111',om:'#222',hp:'#b0148a',lab:'#111',xh:'#000',hb:'#fff',hg:'#d0d4da',ht:'#666',hc:['#d11','#0a0','#b09500','#08a']}};
 let C=TH.dark;
 function setTheme(m){
   C=TH[m]||TH.dark;document.documentElement.dataset.theme=m;
@@ -131,7 +133,7 @@ const mr=(D,p)=>.622*es(D)/(p-es(D));
 const thetae=(T,D,p)=>{const K=T+273.15,Dk=D+273.15,tl=1/(1/(Dk-56)+Math.log(K/Dk)/800)+56,r=mr(D,p)*1000;
   return K*Math.pow(1000/p,.2857*(1-.28e-3*r))*Math.exp((3.376/tl-.00254)*r*(1+.81e-3*r))};
 const HP=(lv,p)=>{const v=ip(lv,p,'hgt'),a=lv[0];if(v!=null)return v;return p>a.p&&a.hgt!=null?a.hgt-(287*(a.t+273.15)/9.81)*lp(p/a.p):null};
-function parcel(lv,kind){
+function parcel(lv,kind,hov){const col=hov?C.hp:C.parc;
   const a=lv[0],ok=lv.filter(l=>l.td!=null);let p0,T0,D0;
   if(kind=='sfc'){p0=a.p;T0=a.t;D0=a.td}
   else if(kind=='ml'){const L=ok.filter(l=>l.p>=a.p-100);if(!L.length)return null;let th=0,r=0;
@@ -153,10 +155,10 @@ function parcel(lv,kind){
     if(lfc==null){if(av>0){lfc=q[0];cape+=ar;cz.push(q,c)}else{cin+=ar;if(!iz.length)iz.push(q);iz.push(c)}}
     else if(av>0){cape+=ar;el=c[0];cz.push(c)}else done=true}
   const pt=(arr,k)=>arr.map(q=>X(q[k]-273.15,q[0]).toFixed(1)+','+Y(q[0]).toFixed(1));
-  let svg=`<polyline points='${pt(path,1).join(' ')}' fill='none' stroke='${C.parc}' stroke-width='2' stroke-dasharray='6 3'/>`;
-  if(cz.length>1)svg+=`<polygon points='${pt(cz,1).concat(pt(cz,2).reverse()).join(' ')}' fill='#ff3030' fill-opacity='.35'/>`;
-  if(iz.length>1)svg+=`<polygon points='${pt(iz,1).concat(pt(iz,2).reverse()).join(' ')}' fill='#3a7bff' fill-opacity='.4'/>`;
-  [['LCL',pl],['LFC',lfc],['EL',el]].forEach(([n,p])=>{if(p!=null&&p>=P1&&p<=p0)svg+=ln(M.l+PW-70,Y(p),M.l+PW,Y(p),C.parc,1)+`<text x='${M.l+PW-68}' y='${Y(p)-3}' fill='${C.parc}' font-size='11'>${n}</text>`});
+  let svg=`<polyline points='${pt(path,1).join(' ')}' fill='none' stroke='${col}' stroke-width='2' stroke-dasharray='6 3'/>`;
+  if(!hov&&cz.length>1)svg+=`<polygon points='${pt(cz,1).concat(pt(cz,2).reverse()).join(' ')}' fill='#ff3030' fill-opacity='.35'/>`;
+  if(!hov&&iz.length>1)svg+=`<polygon points='${pt(iz,1).concat(pt(iz,2).reverse()).join(' ')}' fill='#3a7bff' fill-opacity='.4'/>`;
+  if(!hov)[['LCL',pl],['LFC',lfc],['EL',el]].forEach(([n,p])=>{if(p!=null&&p>=P1&&p<=p0)svg+=ln(M.l+PW-70,Y(p),M.l+PW,Y(p),C.parc,1)+`<text x='${M.l+PW-68}' y='${Y(p)-3}' fill='${C.parc}' font-size='11'>${n}</text>`});
   return {svg,cape,cin,lcl:pl,lfc,el};
 }
 const PTL=[[1537,1330,1537,1312],[1530,1312,1537,1312],[1537,1312,1550,1310],[1550,1330,1550,1281],[1550,1310,1580,1314],[1550,1303,1580,1299],[1550,1293,1580,1290],[1500,1303,1531,1298],[1530,1312,1530,1298],[1531,1298,1537,1290],[1537,1290,1541,1278],[1541,1278,1545,1260],[1537,1312,1542,1290],[1536,1290,1550,1290],[1550,1281,1560,1260]];
@@ -190,14 +192,20 @@ function mixing(lv){
   let ptop=null;
   for(let i=0;i<lv.length-1;i++){const d0=th(lv[i]),d1=th(lv[i+1]);
     if(d1>0){ptop=d0>=0?lv[i].p:lv[i].p*Math.pow(lv[i+1].p/lv[i].p,-d0/(d1-d0));break}}
+  let inv=false;
+  if(ptop==null||a.p-ptop<5){   // no surface-based dry-adiabatic layer (typical at night): use the top of the surface inversion, else the nearly neutral layer
+    let i=0;while(i<lv.length-1&&lv[i+1].t>=lv[i].t)i++;
+    if(i<1){i=0;while(i<lv.length-1&&th(lv[i+1])<=1.5)i++}
+    if(i>=1&&a.p-lv[i].p>=5){ptop=lv[i].p;inv=true}
+  }
   if(ptop==null||a.p-ptop<5||a.u==null||a.hgt==null)return null;
   const ut=ip(lv,ptop,'u'),vt=ip(lv,ptop,'v');if(ut==null)return null;
-  const pts=lv.filter(l=>l.p>=ptop&&l.u!=null);pts.push({p:ptop,spd:Math.hypot(ut,vt),u:ut,v:vt});
+  const pts=lv.filter(l=>l.p>=ptop&&l.u!=null);if(!pts.length||pts[pts.length-1].p>ptop+.01)pts.push({p:ptop,spd:Math.hypot(ut,vt),u:ut,v:vt});
   let mx=0,su=0,sv=0,sp=0;
   pts.forEach(q=>{mx=Math.max(mx,q.spd);su+=q.u;sv+=q.v;sp+=q.p});
   const mu=su/pts.length,mv=sv/pts.length;
   const zt=HP(lv,ptop);if(zt==null)return null;
-  return {th0,ptop,top:[(Math.atan2(-ut,-vt)*180/Math.PI+360)%360,Math.hypot(ut,vt)],sfc:[a.dir,a.spd],mean:[(Math.atan2(-mu,-mv)*180/Math.PI+360)%360,Math.hypot(mu,mv)],pm:sp/pts.length,max:mx,depth:zt-a.hgt};
+  return {inv,th0,ptop,top:[(Math.atan2(-ut,-vt)*180/Math.PI+360)%360,Math.hypot(ut,vt)],sfc:[a.dir,a.spd],mean:[(Math.atan2(-mu,-mv)*180/Math.PI+360)%360,Math.hypot(mu,mv)],pm:sp/pts.length,max:mx,depth:zt-a.hgt};
 }
 function draw(){
   const f=F[fi],s=f.times[ti],lv=s.lev,h0=lv[0].hgt;
@@ -229,12 +237,16 @@ function draw(){
   s.dgz=dg;
   const pc=$('#o6').checked?parcel(lv,$('#ps').value):null;if(pc)h+=pc.svg;
   const mx=$('#o8').checked?mixing(lv):null;s.mix=mx;
-  if(mx){const tp=p=>X(mx.th0*Math.pow(p/1000,.2857)-273.15,p),mp=[];
+  if(mx){const tp=mx.inv?(p=>X(ip(lv,p,'t'),p)):(p=>X(mx.th0*Math.pow(p/1000,.2857)-273.15,p)),mp=[];
     for(let p=lv[0].p;p>mx.ptop;p-=5)mp.push(tp(p).toFixed(1)+','+Y(p).toFixed(1));
     mp.push(tp(mx.ptop).toFixed(1)+','+Y(mx.ptop).toFixed(1));
     h+=pl(mp,C.mix,4);
     const lab=(p,w,dy)=>w[0]==null?'':`<text x='${tp(p)+10}' y='${Y(p)+dy}' fill='${C.lab}' font-size='12'>→ ${Math.round(w[0])}° ${Math.round(w[1])} kt</text>`;
     h+=lab(mx.ptop,mx.top,4)+lab(mx.pm,mx.mean,Y(mx.pm)-Y(mx.ptop)<18?16:4)}
+  if($('#o9').checked){const x0=M.l+.6*PW,k=.25*PW;   // zero line at 60% of the width; 1 Pa/s = 25% of the width; negative (rising) plots to the left
+    h+=ln(x0,M.t,x0,M.t+PH,C.om,1,'6 4');
+    const op=lv.filter(l=>l.om!=null).map(l=>(x0+l.om*k).toFixed(1)+','+Y(l.p).toFixed(1));
+    if(op.length>1)h+=pl(op,C.om,1.5)}
   h+=`</g>`;
   for(const p of PL){const yy=Y(p);if(yy<M.t+6||yy>M.t+PH-2)continue;
     h+=`<text x="${M.l-4}" y="${yy+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
@@ -244,7 +256,7 @@ function draw(){
   if($('#o3').checked){let last=1e9;
     for(const l of lv){const y=Y(l.p);if(l.dir==null||y<M.t||y>M.t+PH||Math.abs(y-last)<16)continue;last=y;
       const c=l.spd>=50?C.barbS:C.barb;h+=`<g>${barb(W-34,y,l.dir,l.spd,c)}</g>`}}
-  h+=`<line id="xh" x1="${M.l}" x2="${M.l+PW}" y1="-9" y2="-9" stroke="${C.xh}" stroke-opacity=".5"/><rect id="ov" x="${M.l}" y="${M.t}" width="${PW}" height="${PH}" fill="transparent"/>`;
+  h+=`<g id="hv" clip-path="url(#c)"></g><g id="ht"></g><line id="xh" x1="${M.l}" x2="${M.l+PW}" y1="-9" y2="-9" stroke="${C.xh}" stroke-opacity=".5"/><rect id="ov" x="${M.l}" y="${M.t}" width="${PW}" height="${PH}" fill="transparent"/>`;
   $('#sk').innerHTML=h;
   const dt=new Date(s.d),fh=Math.round((s.d-f.times[0].d)/36e5);
   $('#title').textContent=`${f.stid} ${dt.toUTCString().slice(5,22)} UTC (F${String(fh).padStart(3,'0')}) · ${dt.toLocaleString([],{weekday:'short',month:'numeric',day:'numeric',hour:'numeric',timeZoneName:'short'})}`;
@@ -285,7 +297,7 @@ function legend(){
     :`<svg width="30" height="12"><line x1="1" y1="6" x2="29" y2="6" stroke="${c}" stroke-width="${kind=='thick'?5:kind=='line'?2.5:2}"${kind=='dash'?' stroke-dasharray="5 3"':''}/></svg>`;
   const items=[['line',C.t,1,'Temperature'],['line',C.td,1,'Dewpoint'],['dash',C.wb,1,'Wet bulb','o2'],['dash',C.parc,1,'Parcel trace','o6'],
     ['fill','#ff3030',.35,'CAPE','o6'],['fill','#3a7bff',.4,'CIN','o6'],['thick','#ff5ad8',1,'Dendritic zone (−12 to −18°C)','o7'],
-    ['thick',C.mix,1,'Mixed layer (momentum transfer)','o8'],['fill',C.rh,C.rhOp,'RH ≥ 95% (cloud layer)','o5'],['dash',C.dry,1,'Dry adiabats','o1'],['line',C.iso0,1,'0°C isotherm']];
+    ['thick',C.mix,1,'Mixed layer (momentum transfer)','o8'],['fill',C.rh,C.rhOp,'RH ≥ 95% (cloud layer)','o5'],['dash',C.dry,1,'Dry adiabats','o1'],['line',C.iso0,1,'0°C isotherm'],['line',C.om,1,'Omega (left of dashed = rising)','o9'],['dash',C.hp,1,'Hover parcel (lift from cursor)','o10']];
   $('#lg').innerHTML=items.map(([k,c,op,n,id])=>`<div class="lg${id&&!on(id)?' off':''}">${sw(k,c,op)}<span>${n}</span></div>`).join('')
     +`<div style="margin:8px 0 2px;color:var(--mu);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Hodograph height AGL</div>`
     +`<div class="lgh">`+['0–1 km','1–3 km','3–6 km','6–9 km'].map((n,i)=>`<div class="lg">${sw('line',C.hc[i]).replace('width="30"','width="20"').replace('x2="29"','x2="19"')}<span>${n}</span></div>`).join('')+`</div>`;
@@ -316,7 +328,9 @@ function indices(s,pc){
   {const w=pwat(lv);if(w!=null)add('PWAT in / mm',`${f(w/25.4,2)} / ${f(w,1)}`)}
   if(pc){add(`${$('#ps').selectedOptions[0].text}: CAPE / CIN`,`${f(pc.cape)} / ${f(pc.cin)}`);add('LCL / LFC / EL mb',[pc.lcl,pc.lfc,pc.el].map(v=>v==null?'–':Math.round(v)).join(' / '))}
   if(s.dgz&&s.dgz.length)add('Dendritic zone (depth)',s.dgz.map(([pb,pt])=>{const z0=HP(lv,pb),z1=HP(lv,pt);return `${Math.round(pb)}–${Math.round(pt)} mb`+(z0!=null&&z1!=null?` (${Math.round(z1-z0)} m)`:'')}).join('<br>'))
-  if(s.mix){const m=s.mix;add('Mixing height AGL',`${Math.round(m.depth)} m / ${Math.round(m.depth*3.281)} ft`);
+  if(s.dgz&&s.dgz.length){const v=lv.filter(l=>l.om!=null&&s.dgz.some(([pb,pt])=>l.p<=pb&&l.p>=pt)).map(l=>l.om);
+    if(v.length)add('ω in DGZ mean / min Pa/s',`${f(v.reduce((a,b)=>a+b,0)/v.length,2)} / ${f(Math.min(...v),2)}`)}
+  if(s.mix){const m=s.mix;add(m.inv?'Mixing depth (inversion top)':'Mixing height AGL',`${Math.round(m.depth)} m / ${Math.round(m.depth*3.281)} ft`);
     add('Wind at mix top',`${Math.round(m.top[0])}° @ ${Math.round(m.top[1])} kt`);
     add('Mixed-layer mean wind',`${Math.round(m.mean[0])}° @ ${Math.round(m.mean[1])} kt`);add('Mixed-layer max wind',`${m.max.toFixed(0)} kt`)}
   const H=p=>HP(lv,p);
@@ -331,14 +345,30 @@ function indices(s,pc){
   add('Sfc T / Td °C',`${f(lv[0].t,1)} / ${f(lv[0].td,1)}`);
   $('#ix').innerHTML=r.join('');
 }
+function hclear(){const a=$('#hv'),b=$('#ht');if(a)a.innerHTML='';if(b)b.innerHTML=''}
+function hparcel(q,p,lv,zz){   // parcel lifted from the level under the cursor: trace, marker and a small readout box
+  hclear();if(!$('#o10').checked||p>lv[0].p)return;
+  const T=ip(lv,p,'t'),D=ip(lv,p,'td');if(T==null)return;
+  const pc=parcel(lv,p,true),n=v=>v==null?'–':Math.round(v);
+  let g=pc?pc.svg:'';g+=`<circle cx="${X(T,p)}" cy="${Y(p)}" r="4" fill="${C.hp}" stroke="${C.bg}"/>`;
+  $('#hv').innerHTML=g;
+  const L=[`${p.toFixed(0)} mb · ${zz==null?'–':Math.round(zz)} m · ${zz==null?'–':Math.round(zz*3.281)} ft MSL`,
+    `T ${T.toFixed(1)}°C   Td ${D==null?'–':D.toFixed(1)}°C`,
+    pc?`Lift from here: CAPE ${n(pc.cape)}  CIN ${n(pc.cin)} J/kg`:'Lift from here: n/a',
+    pc?`LCL ${n(pc.lcl)}  LFC ${n(pc.lfc)}  EL ${n(pc.el)} mb`:''].filter(Boolean);
+  const w=250,h=10+L.length*17,bx=q.x+18+w>M.l+PW?q.x-18-w:q.x+18,by=Math.min(Math.max(q.y-h/2,M.t+4),M.t+PH-h-4);
+  $('#ht').innerHTML=`<rect x="${bx}" y="${by}" width="${w}" height="${h}" rx="4" fill="${C.bg}" fill-opacity=".88" stroke="${C.hp}"/>`
+    +L.map((t,i)=>`<text x="${bx+8}" y="${by+19+i*17}" font-size="12" fill="${i==0?C.hp:C.lab}">${t}</text>`).join('');
+}
 function hover(e){
   const sv=$('#sk'),pt=sv.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;const q=pt.matrixTransform(sv.getScreenCTM().inverse());
-  if(q.y<M.t||q.y>M.t+PH)return;const p=PI(q.y),lv=F[fi].times[ti].lev;
+  if(q.y<M.t||q.y>M.t+PH){hclear();return}const p=PI(q.y),lv=F[fi].times[ti].lev;
   $('#xh').setAttribute('y1',q.y);$('#xh').setAttribute('y2',q.y);
   const g=(k,d=1)=>{const v=ip(lv,p,k);return v==null?'–':v.toFixed(d)};
   const u=ip(lv,p,'u'),v=ip(lv,p,'v');let w='–';
   if(u!=null){const sp=Math.hypot(u,v),dr=(Math.atan2(-u,-v)*180/Math.PI+360)%360;w=`${dr.toFixed(0)}° @ ${sp.toFixed(0)} kt`}
   const zz=ip(lv,p,'hgt'),zs=zz==null?'–':`${Math.round(zz)} m / ${Math.round(zz*3.281)} ft MSL (${Math.round((zz-lv[0].hgt)*3.281)} ft AGL)`;
+  hparcel(q,p,lv,zz);
   $('#ro').textContent=`${p.toFixed(0)} mb  ${zs}  T ${g('t')}°C  Td ${g('td')}°C  Tw ${g('tw')}°C  wind ${w}  ω ${g('om',2)}`;
 }
 let MAN=null;
@@ -360,7 +390,7 @@ async function initPicker(){
 }
 function updLabel(){   // "Data updated 14:20 EST · 18 min ago"
   const el=$('#upd');if(!MAN||!MAN.updated){el.textContent='';return}
-  const t=new Date(MAN.updated),mins=Math.max(0,Math.round((Date.now()-t)/60000));
+  const t=new Date(MAN.updated);if(isNaN(t)){el.textContent='';return}const mins=Math.max(0,Math.round((Date.now()-t)/60000));
   const ago=mins<60?`${mins} min ago`:`${Math.floor(mins/60)} h ${mins%60} min ago`;
   const loc=t.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
   el.textContent=`Data updated ${loc} · ${ago}`;el.style.color=mins>150?'var(--bad,#d9534f)':'var(--mu)';
@@ -412,11 +442,12 @@ $('#fs').onchange=e=>{fi=+e.target.value;setF()};
 $('#tr').oninput=e=>{ti=+e.target.value;draw()};
 $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
-['o1','o2','o3','o4','o5','o6','o7','o8','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
+['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
 const sk=$('#sk');let drag=null;
 const svgPt=e=>{const pt=sk.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(sk.getScreenCTM().inverse())};
 const inPlot=q=>q.x>=M.l&&q.x<=M.l+PW&&q.y>=M.t&&q.y<=M.t+PH;
 sk.addEventListener('mousemove',e=>F.length&&!drag&&hover(e));
+sk.addEventListener('mouseleave',hclear);
 sk.addEventListener('wheel',e=>{if(!F.length)return;const q=svgPt(e);if(!inPlot(q)||(e.deltaY>0&&Z.k<=1))return;
   e.preventDefault();zoomAt(q.x,q.y,e.deltaY<0?1.25:0.8)},{passive:false});
 sk.addEventListener('mousedown',e=>{if(e.button!==0||Z.k<=1||!F.length)return;const q=svgPt(e);if(!inPlot(q))return;
