@@ -187,25 +187,19 @@ function barb(x,y,dir,spd,col){
   return `<path d="${d}" fill="${col}" stroke="${col}" stroke-width="1.2"/>`;
 }
 function mixing(lv){
-  const a=lv[0],K=.2857,th0=(a.t+273.15)*Math.pow(1000/a.p,K);
-  const th=l=>(l.t+273.15)*Math.pow(1000/l.p,K)-th0;
-  let ptop=null;
-  for(let i=0;i<lv.length-1;i++){const d0=th(lv[i]),d1=th(lv[i+1]);
-    if(d1>0){ptop=d0>=0?lv[i].p:lv[i].p*Math.pow(lv[i+1].p/lv[i].p,-d0/(d1-d0));break}}
-  let inv=false;
-  if(ptop==null||a.p-ptop<5){   // no surface-based dry-adiabatic layer (typical at night): use the top of the surface inversion, else the nearly neutral layer
-    let i=0;while(i<lv.length-1&&lv[i+1].t>=lv[i].t)i++;
-    if(i<1){i=0;while(i<lv.length-1&&th(lv[i+1])<=1.5)i++}
-    if(i>=1&&a.p-lv[i].p>=5){ptop=lv[i].p;inv=true}
-  }
-  if(ptop==null||a.p-ptop<5||a.u==null||a.hgt==null)return null;
-  const ut=ip(lv,ptop,'u'),vt=ip(lv,ptop,'v');if(ut==null)return null;
-  const pts=lv.filter(l=>l.p>=ptop&&l.u!=null);if(!pts.length||pts[pts.length-1].p>ptop+.01)pts.push({p:ptop,spd:Math.hypot(ut,vt),u:ut,v:vt});
+  // Mixed layer for momentum transfer: climb from the surface while theta rises by no more than 3 K per km between
+  // adjacent levels (tuned to reproduce BUFKIT at KAVL 18Z and KRDU day and night). The top is the last level reached.
+  const a=lv[0],K=.2857,th=l=>(l.t+273.15)*Math.pow(1000/l.p,K),th0=th(a);
+  if(a.u==null||a.hgt==null)return null;
+  let k=0;
+  while(k<lv.length-1){const b=lv[k+1],c=lv[k];if(b.hgt==null||c.hgt==null||b.hgt<=c.hgt)break;
+    if((th(b)-th(c))/(b.hgt-c.hgt)*1000<=3)k++;else break}
+  if(k<1)return null;
+  const pts=lv.slice(0,k+1).filter(l=>l.u!=null),t=lv[k];if(!pts.length||t.u==null)return null;
   let mx=0,su=0,sv=0,sp=0;
   pts.forEach(q=>{mx=Math.max(mx,q.spd);su+=q.u;sv+=q.v;sp+=q.p});
-  const mu=su/pts.length,mv=sv/pts.length;
-  const zt=HP(lv,ptop);if(zt==null)return null;
-  return {inv,th0,ptop,top:[(Math.atan2(-ut,-vt)*180/Math.PI+360)%360,Math.hypot(ut,vt)],sfc:[a.dir,a.spd],mean:[(Math.atan2(-mu,-mv)*180/Math.PI+360)%360,Math.hypot(mu,mv)],pm:sp/pts.length,max:mx,depth:zt-a.hgt};
+  const mu=su/pts.length,mv=sv/pts.length,dv=(u,v)=>[(Math.atan2(-u,-v)*180/Math.PI+360)%360,Math.hypot(u,v)];
+  return {inv:false,th0,ptop:t.p,top:dv(t.u,t.v),sfc:[a.dir,a.spd],mean:dv(mu,mv),pm:sp/pts.length,max:mx,depth:t.hgt-a.hgt};
 }
 function draw(){
   const f=F[fi],s=f.times[ti],lv=s.lev,h0=lv[0].hgt;
@@ -237,7 +231,7 @@ function draw(){
   s.dgz=dg;
   const pc=$('#o6').checked?parcel(lv,$('#ps').value):null;if(pc)h+=pc.svg;
   const mx=$('#o8').checked?mixing(lv):null;s.mix=mx;
-  if(mx){const tp=mx.inv?(p=>X(ip(lv,p,'t'),p)):(p=>X(mx.th0*Math.pow(p/1000,.2857)-273.15,p)),mp=[];
+  if(mx){const tp=p=>X(ip(lv,p,'t'),p),mp=[];
     for(let p=lv[0].p;p>mx.ptop;p-=5)mp.push(tp(p).toFixed(1)+','+Y(p).toFixed(1));
     mp.push(tp(mx.ptop).toFixed(1)+','+Y(mx.ptop).toFixed(1));
     h+=pl(mp,C.mix,4);
