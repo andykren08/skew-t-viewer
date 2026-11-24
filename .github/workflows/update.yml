@@ -15,27 +15,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site folder
+        run: |
+          mkdir -p site
+          cp index.html site/
+      - name: Download latest BUFKIT files
+        run: |
+          export PAGES_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}"
+          python3 scripts/fetch_bufkit.py site/data
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # A separate job, so GitHub has time to register the uploaded site before it is deployed.
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build site folder
-        run: |
-          mkdir -p site
-          cp index.html site/
-          
-      - name: Download latest BUFKIT files
-        run: python3 scripts/fetch_bufkit.py site/data
-        
-      - uses: actions/configure-pages@v5
-      
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
           
       - id: deployment
         uses: actions/deploy-pages@v4
