@@ -51,6 +51,7 @@ input[type=range]{flex:1;min-width:140px}
 <label><input type="checkbox" id="o8" checked> Momentum transfer</label>
 <label><input type="checkbox" id="o9" checked> Omega (Pa/s)</label>
 <label><input type="checkbox" id="o10" checked> Hover parcel</label>
+<label><input type="checkbox" id="o11" checked> Precip type / rate</label>
 <select id="ps"><option value="sfc">Surface parcel</option><option value="ml">Mixed layer (100 mb)</option><option value="mu">Most unstable (300 mb)</option><option value="925">925 mb</option><option value="850">850 mb</option><option value="800">800 mb</option><option value="700">700 mb</option><option value="600">600 mb</option></select></div>
 <div class="card" id="vw"><h3>Zoom</h3>
 <div class="vb"><button id="zi" title="Zoom in (+)">＋</button><button id="zo" title="Zoom out (−)">－</button><button id="zr" title="Reset zoom (Esc or 0)">Reset</button></div>
@@ -82,13 +83,32 @@ function setTheme(m){
   if(m!=='light'&&m!=='dark')m=window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
   C=TH[m];document.documentElement.dataset.theme=m})();
 
+function surfTable(txt){   // the hourly surface table at the end of the file: precip amount, precip-type flags, 2 m T ...
+  const m=txt.match(/^STN\s+YYMMDD\/HHMM[^\n]*/m),map={};if(!m)return map;
+  const rest=txt.slice(m.index).split(/\r?\n/),names=[];let k=0;
+  while(k<rest.length&&!/^\s*\d{4,}\s+\d{6}\/\d{4}/.test(rest[k])){names.push(...rest[k].trim().split(/\s+/).filter(Boolean));k++}
+  const tok=rest.slice(k).join(' ').trim().split(/\s+/),n=names.length;if(n<4)return map;
+  for(let i=0;i+n<=tok.length;i+=n){const r={};names.forEach((nm,j)=>{const v=tok[i+j];r[nm]=nm==='YYMMDD/HHMM'?v:(+v<=-9999?null:+v)});
+    const t=String(r['YYMMDD/HHMM']).match(/(\d{2})(\d{2})(\d{2})\/(\d{2})(\d{2})/);
+    if(t)map[Date.UTC(2000+ +t[1],t[2]-1,+t[3],+t[4],+t[5])]=r}
+  return map;
+}
+const DOTS=[0.02,0.25,1,2.5];   // mm per hour needed for 1, 2, 3, 4 dots (fitted to BUFKIT GFS at KRDU: 0.3 -> 2, 2.2 -> 3, 2.9 -> 4)
+function precip(sf){
+  if(!sf)return null;let key=null,hr=0;
+  for(const k in sf){const m=k.match(/^P(\d\d)M$/);if(m&&sf[k]!=null&&+m[1]>0){key=k;hr=+m[1];break}}
+  if(!key)return null;const rate=sf[key]/hr;
+  const fl=[['WXTZ','ZR','#ff3b3b'],['WXTP','IP','#ff5ad8'],['WXTS','S','#4da3ff'],['WXTR','R','#22d322']].filter(x=>sf[x[0]]>0);
+  return {rate,dots:DOTS.filter(x=>rate>=x).length,types:fl.map(x=>x[1]),color:fl.length?fl[0][2]:'#9aa3b0',hr};
+}
 function parse(txt){
   const g=r=>(txt.match(r)||[])[1];
   const sN=(g(/SNPARM\s*=\s*([^\r\n]+)/)||'').split(';').map(s=>s.trim());
   const pN=(g(/STPARM\s*=\s*([^\r\n]+)/)||'').split(';').map(s=>s.trim()).filter(Boolean);
   const nums=l=>{const t=l.trim().split(/\s+/);return t[0]!==''&&t.every(x=>!isNaN(+x))?t.map(Number):null};
   const times=[];let stid='';
-  for(const b of txt.split(/STID\s*=/).slice(1)){
+  const ti=txt.search(/^STN\s+YYMMDD\/HHMM/m),main=ti>=0?txt.slice(0,ti):txt;
+  for(const b of main.split(/STID\s*=/).slice(1)){
     const L=b.split(/\r?\n/), tm=b.match(/TIME\s*=\s*(\d{2})(\d{2})(\d{2})\/(\d{2})(\d{2})/);
     const iP=L.findIndex(l=>/^\s*PRES\b/.test(l)), iS=L.findIndex(l=>/^\s*STIM\b/.test(l));
     if(!tm||iP<0)continue;
@@ -110,6 +130,7 @@ function parse(txt){
     }
     if(lev.length>2)times.push({d:Date.UTC(2000+ +tm[1],tm[2]-1,+tm[3],+tm[4],+tm[5]),lev,st});
   }
+  const sf=surfTable(txt);times.forEach(t=>t.sf=sf[t.d]||null);
   return {stid,times};
 }
 async function load(files){
@@ -242,6 +263,13 @@ function draw(){
     const op=lv.filter(l=>l.om!=null).map(l=>(x0+l.om*k).toFixed(1)+','+Y(l.p).toFixed(1));
     if(op.length>1)h+=pl(op,C.om,1.5)}
   h+=`</g>`;
+  const pr=$('#o11').checked?precip(s.sf):null;s.pr=pr;
+  if(pr&&pr.dots){const bx=M.l+8,by=M.t+8,cx=bx+34,cy=by+31;
+    const D=[[[0,0]],[[-11,0],[11,0]],[[0,-10],[-12,8],[12,8]],[[0,-12],[-13,0],[13,0],[0,12]]][pr.dots-1];
+    h+=`<rect x="${bx}" y="${by}" width="158" height="62" rx="6" fill="${C.bg}" fill-opacity=".8" stroke="${C.ax}" stroke-opacity=".4"/>`
+      +D.map(([dx,dy])=>`<circle cx="${cx+dx}" cy="${cy+dy}" r="7" fill="${pr.color}"/>`).join('')
+      +`<text x="${bx+68}" y="${by+30}" font-size="20" font-weight="700" fill="${pr.color}">${pr.types.join('/')||'?'}</text>`
+      +`<text x="${bx+68}" y="${by+50}" font-size="12" fill="${C.lab}">${pr.rate.toFixed(pr.rate<1?2:1)} mm/h</text>`}
   for(const p of PL){const yy=Y(p);if(yy<M.t+6||yy>M.t+PH-2)continue;
     h+=`<text x="${M.l-4}" y="${yy+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
     if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${yy-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m</text>`}}
@@ -319,6 +347,8 @@ function indices(s,pc){
   const add=(a,b)=>r.push(`<tr><td>${a}</td><td>${b}</td></tr>`),f=(v,d=0)=>v==null?'–':(+v).toFixed(d);
   for(const [k,n,d] of [['CAPE','CAPE J/kg',0],['CINS','CIN J/kg',0],['LCLP','LCL mb',0],['KINX','K index',0],['TOTL','Total totals',0],['SHOW','Showalter',1],['LIFT','Lifted idx',1]])
     if(k in st)add(n,f(st[k],d));
+  if(s.pr&&s.pr.dots){const N={R:'Rain',S:'Snow',IP:'Sleet',ZR:'Freezing rain'};
+    add('Precip type / rate',`${s.pr.types.map(x=>N[x]).join(' / ')||'type n/a'} · ${s.pr.rate.toFixed(2)} mm/h (${(s.pr.rate/25.4).toFixed(2)} in/h)`)}
   {const w=pwat(lv);if(w!=null)add('PWAT in / mm',`${f(w/25.4,2)} / ${f(w,1)}`)}
   if(pc){add(`${$('#ps').selectedOptions[0].text}: CAPE / CIN`,`${f(pc.cape)} / ${f(pc.cin)}`);add('LCL / LFC / EL mb',[pc.lcl,pc.lfc,pc.el].map(v=>v==null?'–':Math.round(v)).join(' / '))}
   if(s.dgz&&s.dgz.length)add('Dendritic zone (depth)',s.dgz.map(([pb,pt])=>{const z0=HP(lv,pb),z1=HP(lv,pt);return `${Math.round(pb)}–${Math.round(pt)} mb`+(z0!=null&&z1!=null?` (${Math.round(z1-z0)} m)`:'')}).join('<br>'))
@@ -436,7 +466,7 @@ $('#fs').onchange=e=>{fi=+e.target.value;setF()};
 $('#tr').oninput=e=>{ti=+e.target.value;draw()};
 $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
-['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
+['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','o11','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
 const sk=$('#sk');let drag=null;
 const svgPt=e=>{const pt=sk.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(sk.getScreenCTM().inverse())};
 const inPlot=q=>q.x>=M.l&&q.x<=M.l+PW&&q.y>=M.t&&q.y<=M.t+PH;
