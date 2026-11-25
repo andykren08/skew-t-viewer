@@ -12,6 +12,7 @@ button,select,label.btn{background:var(--bt);color:var(--tx);border:1px solid va
 button:hover,label.btn:hover{border-color:var(--ac)}
 input[type=file]{display:none}
 #title{font-weight:600;margin-left:6px}
+#mp{position:fixed;left:10px;top:52px;z-index:30;width:min(480px,calc(100vw - 20px));box-shadow:0 6px 24px rgba(0,0,0,.35)}#mp[hidden]{display:none}#mps{width:100%;display:block;background:var(--bg);border-radius:4px}#mps circle{cursor:pointer}#mps circle.na{cursor:default}
 #drop{margin:10px;padding:40px 20px;border:2px dashed var(--bd);border-radius:10px;text-align:center;color:var(--mu);line-height:1.7}
 #drop.over{border-color:var(--ac)}
 main{display:none;grid-template-columns:300px 1fr 210px;gap:10px;padding:10px}
@@ -27,11 +28,12 @@ input[type=range]{flex:1;min-width:140px}
 </style></head><body>
 <header>
 <label class="btn">Open .buf files<input id="fi" type="file" multiple></label>
-<span id="pk" style="display:none;gap:6px;align-items:center"><select id="st"></select><select id="md"></select><select id="rn" title="Model run"></select><span id="cyc" style="color:var(--mu)"></span></span>
+<span id="pk" style="display:none;gap:6px;align-items:center"><select id="st"></select><select id="md"></select><select id="rn" title="Model run"></select><span id="cyc" style="color:var(--mu)"></span><button id="mpb" style="display:none" title="Choose the station on a map">Map</button></span>
 <select id="fs"></select>
 <button id="pv">◀</button><input id="tr" type="range" min="0" max="0" value="0"><button id="nx">▶</button><button id="pl">Play</button>
 <span id="title"></span><span id="upd" style="color:var(--mu);font-size:12px;margin-left:10px" title="When the data files on this site were last refreshed"></span><button id="th" title="Switch light / dark" style="margin-left:auto">◐ Theme</button>
 </header>
+<div id="mp" class="card" hidden><div style="display:flex;align-items:center;margin-bottom:6px"><h3 style="margin:0;flex:1">Stations <span id="mpn" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h3><button id="mpx" title="Close" style="padding:1px 8px">×</button></div><svg id="mps"></svg></div>
 <div id="drop">Drag and drop one or more BUFKIT .buf files here, or use “Open .buf files.”<br>Files stay in your browser; nothing is uploaded.<br>Arrow keys: ←/→ change forecast hour, ↑/↓ change file.</div>
 <main id="mn">
 <aside>
@@ -52,6 +54,9 @@ input[type=range]{flex:1;min-width:140px}
 <label><input type="checkbox" id="o9" checked> Omega (Pa/s)</label>
 <label><input type="checkbox" id="o10" checked> Hover parcel</label>
 <label><input type="checkbox" id="o11" checked> Precip type / rate</label>
+<label><input type="checkbox" id="o12" checked> 1 kft AGL <span style="color:#ff4d4d">━</span></label>
+<label><input type="checkbox" id="o13" checked> 2 kft AGL <span style="color:#ff9f1a">━</span></label>
+<label><input type="checkbox" id="o14" checked> 3 kft AGL <span style="color:#3aa0ff">━</span></label>
 <select id="ps"><option value="sfc">Surface parcel</option><option value="ml">Mixed layer (100 mb)</option><option value="mu">Most unstable (300 mb)</option><option value="925">925 mb</option><option value="850">850 mb</option><option value="800">800 mb</option><option value="700">700 mb</option><option value="600">600 mb</option></select></div>
 <div class="card" id="vw"><h3>Zoom</h3>
 <div class="vb"><button id="zi" title="Zoom in (+)">＋</button><button id="zo" title="Zoom out (−)">－</button><button id="zr" title="Reset zoom (Esc or 0)">Reset</button></div>
@@ -71,8 +76,8 @@ const X=(T,p)=>M.l+(Xf(T,p)-M.l-Z.ox)*Z.k;
 const PI=y=>{const yf=M.t+Z.oy+(y-M.t)/Z.k;return Math.exp(lp(P1)+(yf-M.t)/PH*(lp(P0)-lp(P1)))};
 let F=[],fi=0,ti=0,timer=null;
 const TH={
-  dark:{bg:'#000',iso:'#1b2670',iso0:'#3a7bff',dry:'#0b6b6b',prs:'#555',wb:'#27d3e0',td:'#22e822',t:'#ff2020',ax:'#ccc',hgt:'#e8c34a',rh:'#fff',rhOp:.45,barb:'#fff',barbS:'#e8c34a',parc:'#ffd400',mix:'#f2f2f2',om:'#fff',hp:'#ff7bd5',lab:'#fff',xh:'#fff',hb:'#000',hg:'#333',ht:'#777',hc:['#f33','#3d3','#ee3','#3dd']},
-  light:{bg:'#fff',iso:'#c3cdf0',iso0:'#2456d6',dry:'#8cc3bb',prs:'#9aa1ad',wb:'#0a95a3',td:'#0b9a0b',t:'#d41414',ax:'#222',hgt:'#8a6200',rh:'#6f8fc4',rhOp:.3,barb:'#111',barbS:'#8a4a00',parc:'#c26a00',mix:'#111',om:'#222',hp:'#b0148a',lab:'#111',xh:'#000',hb:'#fff',hg:'#d0d4da',ht:'#666',hc:['#d11','#0a0','#b09500','#08a']}};
+  dark:{bg:'#000',iso:'#1b2670',iso0:'#3a7bff',isoD:'#46d4ff',dry:'#0b6b6b',prs:'#555',wb:'#27d3e0',td:'#22e822',t:'#ff2020',ax:'#ccc',hgt:'#e8c34a',rh:'#fff',rhOp:.45,barb:'#fff',barbS:'#e8c34a',parc:'#ffd400',mix:'#f2f2f2',om:'#fff',hp:'#ff7bd5',lab:'#fff',xh:'#fff',hb:'#000',hg:'#333',ht:'#777',hc:['#f33','#3d3','#ee3','#3dd']},
+  light:{bg:'#fff',iso:'#c3cdf0',iso0:'#2456d6',isoD:'#0a8fc9',dry:'#8cc3bb',prs:'#9aa1ad',wb:'#0a95a3',td:'#0b9a0b',t:'#d41414',ax:'#222',hgt:'#8a6200',rh:'#6f8fc4',rhOp:.3,barb:'#111',barbS:'#8a4a00',parc:'#c26a00',mix:'#111',om:'#222',hp:'#b0148a',lab:'#111',xh:'#000',hb:'#fff',hg:'#d0d4da',ht:'#666',hc:['#d11','#0a0','#b09500','#08a']}};
 let C=TH.dark;
 function setTheme(m){
   C=TH[m]||TH.dark;document.documentElement.dataset.theme=m;
@@ -95,6 +100,7 @@ function surfTable(txt){   // the hourly surface table at the end of the file: p
 }
 // Liquid-equivalent precip rate (in/hr) needed for 1, 2, 3 and 4 dots, by the dominant type.
 // Snow/sleet: roughly 0.3, 0.6 and 1 in/hr of snow at 10:1. Freezing rain: ice accretion matters at much lower rates.
+const AV=[[1,['#ff4d4d']],[2,['#ff9f1a']],[3,['#3aa0ff']]];   // 1, 2, 3 kft AGL: IFR / low MVFR / MVFR limit
 const DOTS={R:[0.01,0.10,0.25,0.50],S:[0.01,0.03,0.06,0.10],IP:[0.01,0.03,0.06,0.10],ZR:[0.01,0.02,0.05,0.10]};
 function precip(sf){
   if(!sf)return null;let key=null,hr=0;
@@ -235,6 +241,7 @@ function draw(){
     const c=(rl(a)>=95&&rl(b)>=95)||(ri(a)>=95&&ri(b)>=95)?C.rh:null;
     if(c)h+=`<rect x='${M.l}' y='${Y(b.p)}' width='${PW}' height='${Y(a.p)-Y(b.p)}' fill='${c}' fill-opacity='${C.rhOp}'/>`}
   for(let T=-150;T<=60;T+=tStep)h+=ln(X(T,P0),Y(P0),X(T,P1),Y(P1),T==0?C.iso0:C.iso,T==0?1.6:1);
+  for(const T of [-12,-18])h+=ln(X(T,P0),Y(P0),X(T,P1),Y(P1),C.isoD,1.4);
   if($('#o1').checked)for(let th=250;th<=600;th+=10){const pts=[];
     for(let p=P0;p>=P1;p-=25)pts.push(X(th*Math.pow(p/1000,.2857)-273.15,p).toFixed(1)+','+Y(p).toFixed(1));
     h+=pl(pts,C.dry,1,'4 4')}
@@ -265,6 +272,13 @@ function draw(){
     h+=ln(x0,M.t,x0,M.t+PH,C.om,1,'6 4');
     const op=lv.filter(l=>l.om!=null).map(l=>(x0+l.om*k).toFixed(1)+','+Y(l.p).toFixed(1));
     if(op.length>1)h+=pl(op,C.om,1.5)}
+  if(($('#o12').checked||$('#o13').checked||$('#o14').checked)&&lv[0].hgt!=null){
+    const pz=z=>{for(let i=0;i<lv.length-1;i++){const a=lv[i],b=lv[i+1];if(a.hgt==null||b.hgt==null)continue;
+      if(z>=a.hgt&&z<=b.hgt)return Math.exp(lp(a.p)+(z-a.hgt)/(b.hgt-a.hgt)*(lp(b.p)-lp(a.p)))}return null};
+    let ly=1e9;   // labels sit left of the LCL/LFC/EL labels; stacked upward when the lines are close together
+    for(const [kft,c] of AV){if(!$('#o'+(11+kft)).checked)continue;const p=pz(lv[0].hgt+kft*304.8);if(p==null||p<P1)continue;const y=Y(p);
+      ly=Math.min(y-3,ly-12);
+      h+=ln(M.l,y,M.l+PW,y,c[0],1.6,'8 4')+`<text x="${M.l+PW-70}" y="${ly}" fill="${c[0]}" font-size="12" font-weight="700" text-anchor="end">${kft} kft</text>`}}
   h+=`</g>`;
   const pr=$('#o11').checked?precip(s.sf):null;s.pr=pr;
   if(pr&&pr.dots){const bx=M.l+8,by=M.t+8,cx=bx+34,cy=by+31;
@@ -275,7 +289,7 @@ function draw(){
       +`<text x="${bx+68}" y="${by+50}" font-size="12" fill="${C.lab}">${pr.rate.toFixed(pr.rate<.1?3:2)} in/hr</text>`}
   for(const p of PL){const yy=Y(p);if(yy<M.t+6||yy>M.t+PH-2)continue;
     h+=`<text x="${M.l-4}" y="${yy+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
-    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${yy-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m</text>`}}
+    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${yy-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m / ${Math.round(z*3.281)} ft</text>`}}
   {const pB=PI(M.t+PH);for(let T=-150;T<=60;T+=tStep){const x=X(T,pB);if(x<M.l-1||x>M.l+PW+1)continue;
     h+=`<text x="${x}" y="${H-8}" fill="${C.ax}" font-size="12" text-anchor="middle">${T}</text>`}}
   if($('#o3').checked){let last=1e9;
@@ -322,7 +336,7 @@ function legend(){
     :`<svg width="30" height="12"><line x1="1" y1="6" x2="29" y2="6" stroke="${c}" stroke-width="${kind=='thick'?5:kind=='line'?2.5:2}"${kind=='dash'?' stroke-dasharray="5 3"':''}/></svg>`;
   const items=[['line',C.t,1,'Temperature'],['line',C.td,1,'Dewpoint'],['dash',C.wb,1,'Wet bulb','o2'],['dash',C.parc,1,'Parcel trace','o6'],
     ['fill','#ff3030',.35,'CAPE','o6'],['fill','#3a7bff',.4,'CIN','o6'],['thick','#ff5ad8',1,'Dendritic zone (−12 to −18°C)','o7'],
-    ['thick',C.mix,1,'Mixed layer (momentum transfer)','o8'],['fill',C.rh,C.rhOp,'RH ≥ 95% (cloud layer)','o5'],['dash',C.dry,1,'Dry adiabats','o1'],['line',C.iso0,1,'0°C isotherm'],['line',C.om,1,'Omega (left of dashed = rising)','o9'],['dash',C.hp,1,'Hover parcel (lift from cursor)','o10']];
+    ['thick',C.mix,1,'Mixed layer (momentum transfer)','o8'],['fill',C.rh,C.rhOp,'RH ≥ 95% (cloud layer)','o5'],['dash',C.dry,1,'Dry adiabats','o1'],['line',C.iso0,1,'0°C isotherm'],['line',C.isoD,1,'−12 / −18°C isotherms'],['dash','#ff4d4d',1,'1 kft AGL (IFR)','o12'],['dash','#ff9f1a',1,'2 kft AGL','o13'],['dash','#3aa0ff',1,'3 kft AGL (MVFR)','o14'],['line',C.om,1,'Omega (left of dashed = rising)','o9'],['dash',C.hp,1,'Hover parcel (lift from cursor)','o10']];
   $('#lg').innerHTML=items.map(([k,c,op,n,id])=>`<div class="lg${id&&!on(id)?' off':''}">${sw(k,c,op)}<span>${n}</span></div>`).join('')
     +`<div style="margin:8px 0 2px;color:var(--mu);font-size:11px;text-transform:uppercase;letter-spacing:.05em">Hodograph height AGL</div>`
     +`<div class="lgh">`+['0–1 km','1–3 km','3–6 km','6–9 km'].map((n,i)=>`<div class="lg">${sw('line',C.hc[i]).replace('width="30"','width="20"').replace('x2="29"','x2="19"')}<span>${n}</span></div>`).join('')+`</div>`
@@ -412,7 +426,11 @@ async function initPicker(){
   $('#md').innerHTML=ms.map(m=>`<option>${m}</option>`).join('');
   fillRuns();fillSt();
   $('#pk').style.display='inline-flex';
-  $('#st').onchange=loadRemote;
+  $('#st').onchange=()=>{loadRemote();drawMap()};
+  $('#mpb').style.display=MAN.coords&&Object.keys(MAN.coords).length?'':'none';
+  $('#mpb').onclick=()=>{$('#mp').hidden=!$('#mp').hidden;drawMap()};$('#mpx').onclick=()=>{$('#mp').hidden=true};
+  $('#mps').addEventListener('click',e=>{const c=e.target.closest('circle');if(c&&!c.classList.contains('na'))pickStation(c.dataset.id)});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#mp').hidden){$('#mp').hidden=true;e.stopImmediatePropagation()}},true);
   $('#rn').onchange=()=>{fillSt();loadRemote()};
   $('#md').onchange=()=>{fillRuns();fillSt();loadRemote()};
   loadRemote();updLabel();
@@ -441,10 +459,37 @@ function fillRuns(){   // stay on "latest" when it was selected, otherwise keep 
   sel.innerHTML=rs.map((r,i)=>`<option value="${r.id}">${runLabel(r.init)}${i?'':' · latest'}</option>`).join('');
   sel.value=!wasLatest&&rs.some(r=>r.id===keep)?keep:rs[0].id;
 }
+let STATES=null;
+async function loadStates(){
+  if(STATES!==null)return STATES;STATES=[];
+  try{const r=await fetch('data/states.json');if(r.ok)STATES=(await r.json()).rings||[]}catch(e){}
+  return STATES;
+}
+async function drawMap(){
+  const mp=$('#mp');if(mp.hidden||!MAN||!MAN.coords)return;
+  const C0=MAN.coords,ids=Object.keys(C0);if(!ids.length)return;
+  const ok=new Set(curRun().stations),cur=$('#st').value,rings=await loadStates();
+  let a=1e9,b=-1e9,c=1e9,d=-1e9;ids.forEach(k=>{const [la,lo]=C0[k];a=Math.min(a,lo);b=Math.max(b,lo);c=Math.min(c,la);d=Math.max(d,la)});
+  const pad=.6,W=460,sx=Math.cos((c+d)/2*Math.PI/180),k=W/((b-a+2*pad)*sx),H=Math.round((d-c+2*pad)*k);
+  const X=lo=>((lo-(a-pad))*sx*k).toFixed(1),Y=la=>(((d+pad)-la)*k).toFixed(1);
+  let h=`<rect width="${W}" height="${H}" fill="none"/>`;
+  h+=rings.map(r=>`<path d="M${r.map(q=>X(q[0])+' '+Y(q[1])).join('L')}Z" fill="${C.hg}" fill-opacity=".35" stroke="${C.ht}" stroke-width=".8" stroke-linejoin="round"/>`).join('');
+  const dot=(id,on)=>{const [la,lo]=C0[id],isC=id===cur;
+    return `<circle data-id="${id}" cx="${X(lo)}" cy="${Y(la)}" r="${isC?7:5.5}" class="${on?'':'na'}" fill="${on?(isC?'#ff3030':'#5f6bff'):'none'}" stroke="${on?(isC?'#fff':'#1a1f6e'):C.ht}" stroke-width="${isC?2:1}"><title>${id}${on?'':' (not in this model)'}</title></circle>`};
+  h+=ids.filter(i=>!ok.has(i)).map(i=>dot(i,false)).join('')+ids.filter(i=>ok.has(i)&&i!==cur).map(i=>dot(i,true)).join('')+(ids.includes(cur)?dot(cur,ok.has(cur)):'');
+  h+=ids.includes(cur)?(()=>{const [la,lo]=C0[cur];const x=+X(lo),y=+Y(la),r=x>W-60;return `<text x="${r?x-11:x+11}" y="${y+4}" font-size="12" font-weight="700" fill="${C.lab}" text-anchor="${r?'end':'start'}" paint-order="stroke" stroke="${C.bg}" stroke-width="3">${cur}</text>`})():'';
+  const s=$('#mps');s.setAttribute('viewBox',`0 0 ${W} ${H}`);s.innerHTML=h;
+  $('#mpn').textContent=`· ${$('#md').value}, click a dot`;
+}
+function pickStation(id){
+  if(!curRun().stations.includes(id))return;
+  $('#st').value=id;loadRemote();drawMap();
+}
 function fillSt(){
   const keep=$('#st').value,ss=curRun().stations;
   $('#st').innerHTML=ss.map(s=>`<option>${s}</option>`).join('');
   if(ss.includes(keep))$('#st').value=keep;
+  drawMap();
 }
 async function gunzip(r){
   const buf=new Uint8Array(await r.arrayBuffer());
@@ -473,7 +518,7 @@ $('#fs').onchange=e=>{fi=+e.target.value;setF()};
 $('#tr').oninput=e=>{ti=+e.target.value;draw()};
 $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
-['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','o11','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
+['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','o11','o12','o13','o14','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
 const sk=$('#sk');let drag=null;
 const svgPt=e=>{const pt=sk.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(sk.getScreenCTM().inverse())};
 const inPlot=q=>q.x>=M.l&&q.x<=M.l+PW&&q.y>=M.t&&q.y<=M.t+PH;
