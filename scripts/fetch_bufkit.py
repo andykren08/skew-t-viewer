@@ -11,7 +11,8 @@ Sources
 
 Output
   data/<MODEL>/<YYYYMMDDHH>/<STN>.buf.gz   one gzip file per station and run
-  data/manifest.json                       the runs and stations the viewer offers
+  data/manifest.json                       the runs and stations the viewer offers, plus station coordinates
+  data/states.json                         simplified state outlines for the station map in the viewer
 
 Runs already published on the live site (PAGES_URL) are copied from there, so
 in a normal hour only the one new run is downloaded from Iowa State.
@@ -31,7 +32,7 @@ BASE = os.environ.get("BUFKIT_BASE", "https://meteor.geol.iastate.edu/data/bufki
 ARCHIVE = os.environ.get("BUFKIT_ARCHIVE", "https://mtarchive.geol.iastate.edu").rstrip("/")
 KEEP = int(os.environ.get("BUFKIT_KEEP_RUNS", "3"))   # runs kept per model
 
-# Raleigh first, then the rest. A station a model doesn't carry is skipped.
+# A station a model doesn't carry is skipped (with a warning in the Action log).
 STATIONS = [
     "KGSO", "KINT", "KRDU", "KFAY", "KRWI",
     "KIXA", "KGSB", "KRCZ", "KISO", "KPGV",
@@ -54,7 +55,18 @@ MODELS = {
     "RRFS": {"dir": "rrfs", "prefix": "rrfs", "step": 6, "max_age": 14},
 }
 
+# State outlines (GeoJSON, lon/lat) for the map. The first address that works is used.
+STATES_URLS = [u for u in (
+    os.environ.get("BUFKIT_STATES_URL"),
+    "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json",
+    "https://raw.githubusercontent.com/python-visualization/folium/main/examples/data/us-states.json",
+) if u]
+MAP_BOX = (-90.0, 29.0, -72.0, 41.5)   # lon min, lat min, lon max, lat max kept in states.json
+
+COORDS = {}   # station -> [lat, lon], read from the SLAT/SLON line of the .buf files
+
 UA = "NWS-RAH-bufkit-viewer/1.0 (GitHub Actions mirror)"
+LL_RE = re.compile(r"SLAT\s*=\s*(-?[\d.]+)\s+SLON\s*=\s*(-?[\d.]+)")
 TIME_RE = re.compile(r"TIME\s*=\s*(\d{2})(\d{2})(\d{2})/(\d{2})(\d{2})")
 
 
@@ -104,6 +116,56 @@ def init_time(txt):
     return dt.datetime(2000 + y, mo, d, h, mi, tzinfo=dt.timezone.utc)
 
 
+def note_coords(stn, txt):
+    if stn in COORDS or not txt:
+        return
+    m = LL_RE.search(txt[:2000])
+    if m:
+        COORDS[stn] = [float(m.group(1)), float(m.group(2))]
+
+
+def fetch_states(out):
+    """Write data/states.json: outer rings of the states near the stations, rounded to 0.01 degree."""
+    gj = None
+    for u in STATES_URLS:
+        try:
+            gj = json.loads(get_text(u, tries=2) or "")
+            if gj.get("features"):
+                break
+        except Exception:
+            gj = None
+    dest = out / "states.json"
+    if not gj:
+        b = get_bytes(f"{PAGES_URL}/data/states.json", tries=1) if PAGES_URL else None
+        if b:
+            dest.write_bytes(b)
+            print("states.json: download failed, kept the copy already on the site")
+        else:
+            print("WARNING: no state outlines; the map will show stations only", file=sys.stderr)
+        return
+    x0, y0, x1, y1 = MAP_BOX
+    rings = []
+    for f in gj["features"]:
+        g = f.get("geometry") or {}
+        polys = [g["coordinates"]] if g.get("type") == "Polygon" else g.get("coordinates", []) if g.get("type") == "MultiPolygon" else []
+        for poly in polys:
+            ring = poly[0]
+            xs = [p[0] for p in ring]
+            ys = [p[1] for p in ring]
+            if max(xs) < x0 or min(xs) > x1 or max(ys) < y0 or min(ys) > y1:
+                continue
+            pts, last = [], None
+            for lon, lat in ring:
+                q = [round(lon, 2), round(lat, 2)]
+                if q != last:
+                    pts.append(q)
+                    last = q
+            if len(pts) > 3:
+                rings.append(pts)
+    dest.write_text(json.dumps({"rings": rings}, separators=(",", ":")), encoding="utf-8")
+    print(f"states.json: {len(rings)} outlines, {dest.stat().st_size // 1024} KB")
+
+
 def run_id(t):
     return t.strftime("%Y%m%d%H")
 
@@ -144,8 +206,10 @@ def fetch_model(name, cfg, out, old, now):
             data = None
             if PAGES_URL and stn in have:
                 b = get_bytes(f"{PAGES_URL}/data/{name}/{rid}/{stn}.buf.gz", tries=1)
-                if b is not None and init_time(unpack(b)) == t:
+                bt = unpack(b) if b is not None else None
+                if bt is not None and init_time(bt) == t:
                     data, reused = b, reused + 1
+                    note_coords(stn, bt)
             if data is None:
                 if k == 0 and stn == probe_stn:
                     txt = probe_txt
@@ -162,6 +226,7 @@ def fetch_model(name, cfg, out, old, now):
                             break
                     continue
                 data = pack(txt)
+                note_coords(stn, txt)
             (folder / f"{stn}.buf.gz").write_bytes(data)
             done.append(stn)
         if done:
@@ -179,7 +244,7 @@ def fetch_model(name, cfg, out, old, now):
 def main():
     out = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "site/data")
     now = dt.datetime.now(dt.timezone.utc)
-    manifest = {"updated": now.isoformat(timespec="minutes"), "stations": STATIONS, "models": {}}
+    manifest = {"updated": now.isoformat(timespec="minutes"), "stations": STATIONS, "models": {}, "coords": {}}
 
     prev = {}
     if PAGES_URL:
@@ -198,6 +263,8 @@ def main():
     if not manifest["models"]:
         sys.exit("No data downloaded; not publishing so the existing site stays as it is.")
     out.mkdir(parents=True, exist_ok=True)
+    manifest["coords"] = COORDS
+    fetch_states(out)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
 
 
