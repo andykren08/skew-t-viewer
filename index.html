@@ -47,6 +47,7 @@ input[type=range]{flex:1;min-width:140px}
 <label><input type="checkbox" id="o2" checked> Wet bulb</label>
 <label><input type="checkbox" id="o3" checked> Wind barbs</label>
 <label><input type="checkbox" id="o4" checked> Heights</label>
+<div style="margin:0 0 4px 24px;font-size:12px;color:var(--mu)">measured as <select id="hu" style="padding:1px 4px;font-size:12px"><option value="agl">AGL (above ground)</option><option value="msl">MSL (sea level)</option></select></div>
 <label><input type="checkbox" id="o5" checked> RH ≥ 95% shading</label>
 <label><input type="checkbox" id="o6" checked> Parcel</label>
 <label><input type="checkbox" id="o7" checked> Dendritic zone</label>
@@ -277,8 +278,8 @@ function draw(){
       if(z>=a.hgt&&z<=b.hgt)return Math.exp(lp(a.p)+(z-a.hgt)/(b.hgt-a.hgt)*(lp(b.p)-lp(a.p)))}return null};
     let ly=1e9;   // labels sit left of the LCL/LFC/EL labels; stacked upward when the lines are close together
     for(const [kft,c] of AV){if(!$('#o'+(11+kft)).checked)continue;const p=pz(lv[0].hgt+kft*304.8);if(p==null||p<P1)continue;const y=Y(p);
-      ly=Math.min(y-3,ly-12);
-      h+=ln(M.l,y,M.l+PW,y,c[0],1.6,'8 4')+`<text x="${M.l+PW-70}" y="${ly}" fill="${c[0]}" font-size="12" font-weight="700" text-anchor="end">${kft} kft</text>`}}
+      ly=Math.min(y-3,ly-13);
+      h+=ln(M.l,y,M.l+PW,y,c[0],1.6,'8 4')+`<text x="${M.l+PW-70}" y="${ly}" fill="${c[0]}" font-size="12" font-weight="700" text-anchor="end">${kft} kft AGL · ${Math.round((lv[0].hgt+kft*304.8)*3.281/10)*10} ft MSL</text>`}}
   h+=`</g>`;
   const pr=$('#o11').checked?precip(s.sf):null;s.pr=pr;
   if(pr&&pr.dots){const bx=M.l+8,by=M.t+8,cx=bx+34,cy=by+31;
@@ -289,7 +290,8 @@ function draw(){
       +`<text x="${bx+68}" y="${by+50}" font-size="12" fill="${C.lab}">${pr.rate.toFixed(pr.rate<.1?3:2)} in/hr</text>`}
   for(const p of PL){const yy=Y(p);if(yy<M.t+6||yy>M.t+PH-2)continue;
     h+=`<text x="${M.l-4}" y="${yy+4}" fill="${C.ax}" font-size="12" text-anchor="end">${p}</text>`;
-    if($('#o4').checked){const z=ip(lv,p,'hgt');if(z!=null)h+=`<text x="${M.l+4}" y="${yy-3}" fill="${C.hgt}" font-size="11">${Math.round(z)} m / ${Math.round(z*3.281)} ft</text>`}}
+    if($('#o4').checked){const agl=$('#hu').value==='agl',z0=ip(lv,p,'hgt'),z=z0==null?null:agl?z0-lv[0].hgt:z0;
+      if(z!=null&&z>=-1)h+=`<text x="${M.l+4}" y="${yy-3}" fill="${C.hgt}" font-size="11">${Math.round(Math.max(z,0))} m / ${Math.round(Math.max(z,0)*3.281)} ft ${agl?'AGL':'MSL'}</text>`}}
   {const pB=PI(M.t+PH);for(let T=-150;T<=60;T+=tStep){const x=X(T,pB);if(x<M.l-1||x>M.l+PW+1)continue;
     h+=`<text x="${x}" y="${H-8}" fill="${C.ax}" font-size="12" text-anchor="middle">${T}</text>`}}
   if($('#o3').checked){let last=1e9;
@@ -518,7 +520,9 @@ $('#fs').onchange=e=>{fi=+e.target.value;setF()};
 $('#tr').oninput=e=>{ti=+e.target.value;draw()};
 $('#pv').onclick=()=>F.length&&step(-1);$('#nx').onclick=()=>F.length&&step(1);
 $('#pl').onclick=()=>{if(timer){clearInterval(timer);timer=null;$('#pl').textContent='Play'}else if(F.length){timer=setInterval(()=>step(1),700);$('#pl').textContent='Stop'}};
-['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','o11','o12','o13','o14','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
+try{const v=localStorage.getItem('skewt-hu');if(v==='agl'||v==='msl')$('#hu').value=v}catch(e){}
+$('#hu').addEventListener('change',()=>{try{localStorage.setItem('skewt-hu',$('#hu').value)}catch(e){}});
+['o1','o2','o3','o4','o5','o6','o7','o8','o9','o10','o11','o12','o13','o14','hu','ps'].forEach(i=>$('#'+i).onchange=()=>F.length&&draw());
 const sk=$('#sk');let drag=null;
 const svgPt=e=>{const pt=sk.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(sk.getScreenCTM().inverse())};
 const inPlot=q=>q.x>=M.l&&q.x<=M.l+PW&&q.y>=M.t&&q.y<=M.t+PH;
