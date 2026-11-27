@@ -39,6 +39,7 @@ STATIONS = [
     "KCLT", "KHKY", "TNB", "KAVL", "LBT",
     "KDAN", "KLYH", "KROA", "KLWB", "KBLF",
     "KFLO", "KMYR", "KILM", "KMHX", "KOAJ",
+    "KRIC", "KPHF", "KORF", "KECG",
 ]
 
 # Base address of the published site, set by the workflow. Files already there
